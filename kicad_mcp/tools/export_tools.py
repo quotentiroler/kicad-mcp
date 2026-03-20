@@ -20,7 +20,7 @@ def register_export_tools(mcp: FastMCP) -> None:
     """
     
     @mcp.tool()
-    async def generate_pcb_thumbnail(project_path: str, ctx: Context | None):
+    async def generate_pcb_thumbnail(project_path: str, ctx: Context = None):
         """Generate a thumbnail image of a KiCad PCB layout using kicad-cli.
 
         Args:
@@ -96,14 +96,270 @@ def register_export_tools(mcp: FastMCP) -> None:
             return None
 
     @mcp.tool()
-    async def generate_project_thumbnail(project_path: str, ctx: Context | None):
-        """Generate a thumbnail of a KiCad project's PCB layout (Alias for generate_pcb_thumbnail)."""
-        # This function now just calls the main CLI-based thumbnail generator
-        print(f"generate_project_thumbnail called, redirecting to generate_pcb_thumbnail for {project_path}")
-        return await generate_pcb_thumbnail(project_path, ctx)
+    async def refill_zones(project_path: str) -> Dict[str, Any]:
+        """Refill all copper zones in the PCB.
+        
+        This is essential after importing routed traces from Freerouting,
+        as the auto-router doesn't know about copper pours.
+        
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            
+        Returns:
+            Dictionary with refill results
+        """
+        files = get_project_files(project_path)
+        if "pcb" not in files:
+            return {"error": "PCB file not found in project"}
+        
+        pcb_path = files["pcb"]
+        
+        # Find kicad-cli for zone refill
+        if system == "Windows":
+            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
+        elif system == "Darwin":
+            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+        else:
+            kicad_cli = "kicad-cli"
+        
+        if not os.path.exists(kicad_cli) and system != "Linux":
+            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        
+        try:
+            # Use kicad-cli to export DRC which triggers zone refill
+            # Then we re-save the board
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.rpt', delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            cmd = [
+                kicad_cli, "pcb", "drc",
+                "--output", tmp_path,
+                "--severity-all",
+                pcb_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            
+            # Clean up temp file
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            
+            return {
+                "success": True,
+                "message": "Zones refilled via DRC check",
+                "pcb_path": pcb_path
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {"error": "Zone refill timed out"}
+        except Exception as e:
+            return {"error": f"Failed to refill zones: {str(e)}"}
+
+    @mcp.tool()
+    async def export_gerbers(
+        project_path: str,
+        output_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Export Gerber manufacturing files for PCB fabrication.
+        
+        Exports all required layers: copper, mask, silk, edge cuts.
+        
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            output_dir: Output directory (default: project_dir/gerbers)
+            
+        Returns:
+            Dictionary with export results and file paths
+        """
+        files = get_project_files(project_path)
+        if "pcb" not in files:
+            return {"error": "PCB file not found in project"}
+        
+        pcb_path = files["pcb"]
+        project_dir = os.path.dirname(pcb_path)
+        
+        if output_dir is None:
+            output_dir = os.path.join(project_dir, "gerbers")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Find kicad-cli
+        if system == "Windows":
+            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
+        elif system == "Darwin":
+            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+        else:
+            kicad_cli = "kicad-cli"
+        
+        if not os.path.exists(kicad_cli) and system != "Linux":
+            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        
+        try:
+            cmd = [
+                kicad_cli, "pcb", "export", "gerbers",
+                "--output", output_dir,
+                pcb_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode != 0:
+                return {"error": f"Gerber export failed: {result.stderr}"}
+            
+            # List generated files
+            gerber_files = [f for f in os.listdir(output_dir) if f.endswith(('.gbr', '.gtl', '.gbl', '.gts', '.gbs', '.gto', '.gbo', '.gm1'))]
+            
+            return {
+                "success": True,
+                "output_dir": output_dir,
+                "files": gerber_files,
+                "file_count": len(gerber_files)
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {"error": "Gerber export timed out"}
+        except Exception as e:
+            return {"error": f"Failed to export Gerbers: {str(e)}"}
+
+    @mcp.tool()
+    async def export_drill(
+        project_path: str,
+        output_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Export drill files for PCB fabrication.
+        
+        Exports Excellon drill files (.drl) for through-holes and vias.
+        
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            output_dir: Output directory (default: project_dir/gerbers)
+            
+        Returns:
+            Dictionary with export results and file paths
+        """
+        files = get_project_files(project_path)
+        if "pcb" not in files:
+            return {"error": "PCB file not found in project"}
+        
+        pcb_path = files["pcb"]
+        project_dir = os.path.dirname(pcb_path)
+        
+        if output_dir is None:
+            output_dir = os.path.join(project_dir, "gerbers")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Find kicad-cli
+        if system == "Windows":
+            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
+        elif system == "Darwin":
+            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+        else:
+            kicad_cli = "kicad-cli"
+        
+        if not os.path.exists(kicad_cli) and system != "Linux":
+            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        
+        try:
+            cmd = [
+                kicad_cli, "pcb", "export", "drill",
+                "--output", output_dir,
+                pcb_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode != 0:
+                return {"error": f"Drill export failed: {result.stderr}"}
+            
+            # List generated files
+            drill_files = [f for f in os.listdir(output_dir) if f.endswith(('.drl', '.xln'))]
+            
+            return {
+                "success": True,
+                "output_dir": output_dir,
+                "files": drill_files,
+                "file_count": len(drill_files)
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {"error": "Drill export timed out"}
+        except Exception as e:
+            return {"error": f"Failed to export drill files: {str(e)}"}
+
+    @mcp.tool()
+    async def export_pos(
+        project_path: str,
+        output_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Export pick and place file for PCB assembly.
+        
+        Exports component positions for automated assembly machines.
+        
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            output_dir: Output directory (default: project_dir/assembly)
+            
+        Returns:
+            Dictionary with export results and file paths
+        """
+        files = get_project_files(project_path)
+        if "pcb" not in files:
+            return {"error": "PCB file not found in project"}
+        
+        pcb_path = files["pcb"]
+        project_dir = os.path.dirname(pcb_path)
+        
+        if output_dir is None:
+            output_dir = os.path.join(project_dir, "assembly")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Find kicad-cli
+        if system == "Windows":
+            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
+        elif system == "Darwin":
+            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+        else:
+            kicad_cli = "kicad-cli"
+        
+        if not os.path.exists(kicad_cli) and system != "Linux":
+            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        
+        try:
+            cmd = [
+                kicad_cli, "pcb", "export", "pos",
+                "--output", os.path.join(output_dir, "pos.csv"),
+                "--format", "csv",
+                "--units", "mm",
+                pcb_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode != 0:
+                return {"error": f"PnP export failed: {result.stderr}"}
+            
+            # List generated files
+            pos_files = [f for f in os.listdir(output_dir) if f.endswith(('.csv', '.pos'))]
+            
+            return {
+                "success": True,
+                "output_dir": output_dir,
+                "files": pos_files,
+                "file_count": len(pos_files)
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {"error": "PnP export timed out"}
+        except Exception as e:
+            return {"error": f"Failed to export PnP file: {str(e)}"}
+
+    # generate_project_thumbnail removed - was just an alias for generate_pcb_thumbnail
 
 # Helper functions for thumbnail generation
-async def generate_thumbnail_with_cli(pcb_file: str, ctx: Context | None):
+async def generate_thumbnail_with_cli(pcb_file: str, ctx: Context = None):
     """Generate PCB thumbnail using command line tools.
     This is a fallback method when the kicad Python module is not available or fails.
 

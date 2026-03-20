@@ -7,12 +7,150 @@ and checking component boundaries in existing projects.
 
 import json
 import os
+import re
+import subprocess
+import tempfile
 from typing import Any
 
 from fastmcp import Context, FastMCP
 
 from kicad_mcp.utils.boundary_validator import BoundaryValidator
 from kicad_mcp.utils.file_utils import get_project_files
+
+
+def find_kicad_cli() -> str:
+    """Find kicad-cli executable path."""
+    import platform
+    
+    if platform.system() == "Windows":
+        # Check common Windows installation paths
+        possible_paths = [
+            r"C:\Program Files\KiCad\9.0\bin\kicad-cli.exe",
+            r"C:\Program Files\KiCad\8.0\bin\kicad-cli.exe",
+            r"C:\Program Files\KiCad\7.0\bin\kicad-cli.exe",
+            r"C:\Program Files (x86)\KiCad\9.0\bin\kicad-cli.exe",
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+    else:
+        # Linux/macOS - check PATH
+        import shutil
+        kicad_cli = shutil.which("kicad-cli")
+        if kicad_cli:
+            return kicad_cli
+    
+    return "kicad-cli"  # Fallback to PATH lookup
+
+
+async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
+    """
+    Run Design Rule Check (DRC) on a KiCad PCB using kicad-cli.
+
+    Args:
+        project_path: Path to the KiCad project file (.kicad_pro) or PCB file (.kicad_pcb)
+        ctx: Context for MCP communication
+
+    Returns:
+        Dictionary with DRC results including violations grouped by type
+    """
+    try:
+        if ctx:
+            await ctx.info("Running DRC check...")
+            await ctx.report_progress(10, 100)
+
+        # Determine PCB file path
+        if project_path.endswith(".kicad_pro"):
+            pcb_path = project_path.replace(".kicad_pro", ".kicad_pcb")
+        elif project_path.endswith(".kicad_pcb"):
+            pcb_path = project_path
+        else:
+            return {"success": False, "error": "Invalid file path. Must be .kicad_pro or .kicad_pcb"}
+
+        if not os.path.exists(pcb_path):
+            return {"success": False, "error": f"PCB file not found: {pcb_path}"}
+
+        # Create temp file for DRC output
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp:
+            output_path = tmp.name
+
+        if ctx:
+            await ctx.report_progress(30, 100)
+
+        # Run kicad-cli DRC
+        kicad_cli = find_kicad_cli()
+        cmd = [kicad_cli, "pcb", "drc", "-o", output_path, pcb_path]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "DRC check timed out after 60 seconds"}
+        except FileNotFoundError:
+            return {"success": False, "error": f"kicad-cli not found at: {kicad_cli}"}
+
+        if ctx:
+            await ctx.report_progress(70, 100)
+
+        # Parse output for violation counts
+        stdout = result.stdout + result.stderr
+        
+        # Extract counts from kicad-cli output
+        violations_match = re.search(r'Found (\d+) violations?', stdout)
+        unconnected_match = re.search(r'Found (\d+) unconnected items?', stdout)
+        
+        total_violations = int(violations_match.group(1)) if violations_match else 0
+        unconnected_items = int(unconnected_match.group(1)) if unconnected_match else 0
+
+        # Read and parse the DRC report
+        violations_by_type = {}
+        shorts = []
+        clearance_violations = []
+        
+        if os.path.exists(output_path):
+            with open(output_path, 'r') as f:
+                content = f.read()
+            
+            # Parse violation types
+            current_type = None
+            for line in content.split('\n'):
+                # Match violation type headers like [clearance]: or [short]:
+                type_match = re.match(r'\[(\w+)\]:', line)
+                if type_match:
+                    current_type = type_match.group(1)
+                    if current_type not in violations_by_type:
+                        violations_by_type[current_type] = []
+                    violations_by_type[current_type].append(line)
+                    
+                    # Track shorts specifically
+                    if current_type == "short":
+                        shorts.append(line)
+                    elif current_type == "clearance":
+                        clearance_violations.append(line)
+
+            # Clean up temp file
+            os.unlink(output_path)
+
+        if ctx:
+            await ctx.report_progress(100, 100)
+            status = "PASS" if total_violations == 0 else "FAIL"
+            await ctx.info(f"DRC {status}: {total_violations} violations, {unconnected_items} unconnected items")
+
+        return {
+            "success": True,
+            "passed": total_violations == 0 and unconnected_items == 0,
+            "total_violations": total_violations,
+            "unconnected_items": unconnected_items,
+            "shorts": len(shorts),
+            "clearance_violations": len(clearance_violations),
+            "violations_by_type": {k: len(v) for k, v in violations_by_type.items()},
+            "summary": f"DRC: {total_violations} violations ({len(shorts)} shorts, {len(clearance_violations)} clearance), {unconnected_items} unconnected"
+        }
+
+    except Exception as e:
+        error_msg = f"Error running DRC: {str(e)}"
+        if ctx:
+            await ctx.info(error_msg)
+        return {"success": False, "error": error_msg}
 
 
 async def validate_project_boundaries(project_path: str, ctx: Context = None) -> dict[str, Any]:
@@ -282,6 +420,16 @@ def _get_component_type_from_lib_id(lib_id: str) -> str:
 
 def register_validation_tools(mcp: FastMCP) -> None:
     """Register validation tools with the MCP server."""
+
+    @mcp.tool(name="run_drc")
+    async def run_drc_tool(
+        project_path: str, ctx: Context = None
+    ) -> dict[str, Any]:
+        """Run Design Rule Check (DRC) on a KiCad PCB.
+        
+        Returns violations grouped by type including shorts, clearance, and unconnected items.
+        """
+        return await run_drc(project_path, ctx)
 
     @mcp.tool(name="validate_project_boundaries")
     async def validate_project_boundaries_tool(
