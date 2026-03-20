@@ -6,16 +6,15 @@ import json
 import subprocess
 import tempfile
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
 
 from kicad_mcp.config import system
 
-async def run_drc_via_cli(pcb_file: str, ctx: Context | None) -> Dict[str, Any]:
-    """Run DRC using KiCad command line tools.
+
+def run_drc_via_cli_sync(pcb_file: str) -> Dict[str, Any]:
+    """Run DRC using KiCad command line tools (synchronous version).
     
     Args:
         pcb_file: Path to the PCB file (.kicad_pcb)
-        ctx: MCP context for progress reporting
         
     Returns:
         Dictionary with DRC results
@@ -39,10 +38,7 @@ async def run_drc_via_cli(pcb_file: str, ctx: Context | None) -> Dict[str, Any]:
                 results["error"] = "kicad-cli not found. Please ensure KiCad 9.0+ is installed and kicad-cli is available."
                 return results
             
-            # Report progress 
-            if ctx:
-                await ctx.report_progress(50, 100)
-                ctx.info("Running DRC using KiCad CLI...")
+            print("Running DRC using KiCad CLI...")
             
             # Build the DRC command
             cmd = [
@@ -83,9 +79,6 @@ async def run_drc_via_cli(pcb_file: str, ctx: Context | None) -> Dict[str, Any]:
             violations = drc_report.get("violations", [])
             violation_count = len(violations)
             print(f"DRC completed with {violation_count} violations")
-            if ctx:
-                await ctx.report_progress(70, 100)
-                ctx.info(f"DRC completed with {violation_count} violations")
             
             # Categorize violations by type
             error_types = {}
@@ -105,12 +98,10 @@ async def run_drc_via_cli(pcb_file: str, ctx: Context | None) -> Dict[str, Any]:
                 "violations": violations
             }
             
-            if ctx:
-                await ctx.report_progress(90, 100)
             return results
             
     except Exception as e:
-        print(f"Error in CLI DRC: {str(e)}", exc_info=True)
+        print(f"Error in CLI DRC: {str(e)}")
         results["error"] = f"Error in CLI DRC: {str(e)}"
         return results
 
@@ -140,9 +131,14 @@ def find_kicad_cli() -> Optional[str]:
     # If we get here, kicad-cli is not in PATH
     # Try common installation locations
     if system == "Windows":
-        # Common Windows installation path
+        # Common Windows installation path - check versioned paths first
         potential_paths = [
+            r"C:\Program Files\KiCad\9.0\bin\kicad-cli.exe",
+            r"C:\Program Files\KiCad\8.0\bin\kicad-cli.exe",
+            r"C:\Program Files\KiCad\7.0\bin\kicad-cli.exe",
             r"C:\Program Files\KiCad\bin\kicad-cli.exe",
+            r"C:\Program Files (x86)\KiCad\9.0\bin\kicad-cli.exe",
+            r"C:\Program Files (x86)\KiCad\8.0\bin\kicad-cli.exe",
             r"C:\Program Files (x86)\KiCad\bin\kicad-cli.exe"
         ]
     elif system == "Darwin":  # macOS
