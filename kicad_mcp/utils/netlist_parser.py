@@ -140,10 +140,37 @@ class SchematicParser:
         """Extract component information from schematic."""
         print("Extracting components")
         
-        # Extract all symbol expressions (components)
-        symbols = self._extract_s_expressions(r'\(symbol\s+')
+        # First, find where lib_symbols section ends to avoid parsing symbol definitions
+        lib_symbols_end = 0
+        lib_symbols_match = re.search(r'\(lib_symbols\s*', self.content)
+        if lib_symbols_match:
+            # Find the closing parenthesis of lib_symbols
+            start_pos = lib_symbols_match.start()
+            depth = 0
+            for i, char in enumerate(self.content[start_pos:], start_pos):
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                    if depth == 0:
+                        lib_symbols_end = i + 1
+                        break
+            print(f"lib_symbols section ends at position {lib_symbols_end}")
+        
+        # Extract symbol INSTANCES only (they have lib_id attribute)
+        # Symbol instances in KiCad 8 start with (symbol followed by newline and (lib_id
+        symbols = self._extract_s_expressions(r'\(symbol\s*\n\s*\(lib_id\s+')
+        
+        # Also try alternate format: (symbol (lib_id on same line
+        symbols_alt = self._extract_s_expressions(r'\(symbol\s+\(lib_id\s+')
+        symbols.extend(symbols_alt)
         
         for symbol in symbols:
+            # Skip if this symbol is inside the lib_symbols section (it's a definition, not instance)
+            symbol_pos = self.content.find(symbol)
+            if symbol_pos < lib_symbols_end:
+                continue
+                
             component = self._parse_component(symbol)
             if component:
                 self.components.append(component)
@@ -152,7 +179,7 @@ class SchematicParser:
                 ref = component.get('reference', 'Unknown')
                 self.component_info[ref] = component
         
-        print(f"Extracted {len(self.components)} components")
+        print(f"Extracted {len(self.components)} component instances")
 
     def _parse_component(self, symbol_expr: str) -> Dict[str, Any]:
         """Parse a component from a symbol S-expression.
