@@ -31,6 +31,9 @@ from kicad_mcp.tools.routing_tools import register_routing_tools, register_routi
 from kicad_mcp.tools.freerouting_tools import register_freerouting_tools
 from kicad_mcp.tools.placement_tools import register_placement_tools
 from kicad_mcp.tools.placement_proposals import register_placement_proposal_tools
+from kicad_mcp.tools.jlcpcb_tools import register_jlcpcb_tools
+from kicad_mcp.tools.device_tree_tools import register_device_tree_tools
+from kicad_mcp.tools.tool_router import register_tool_router
 
 # Import prompt handlers
 from kicad_mcp.prompts.templates import register_prompts
@@ -164,7 +167,10 @@ def create_server() -> FastMCP:
     register_freerouting_tools(mcp)
     register_placement_tools(mcp)
     register_placement_proposal_tools(mcp)
-    
+    register_jlcpcb_tools(mcp)
+    register_device_tree_tools(mcp)
+    register_tool_router(mcp)
+
     # Register prompts
     logging.info(f"Registering prompts...")
     register_prompts(mcp)
