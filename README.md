@@ -1,4 +1,4 @@
-# KiCad MCP Server (SOM Fork)
+# KiCad MCP Server (Max Health Fork)
 
 > Fork of [lamaalrajih/kicad-mcp](https://github.com/lamaalrajih/kicad-mcp) — extended with PCB layout, auto-routing, placement optimization, manufacturing exports, and embedded firmware tooling.
 
@@ -128,7 +128,7 @@ Create a `.env` file from the example: `cp .env.example .env`
 
 ### End-to-End PCB Manufacturing
 ```
-1. "Analyze my SOM Band project"         → BOM + DRC + netlist overview
+1. "Analyze my Max Health project"         → BOM + DRC + netlist overview
 2. "Optimize component placement"         → Simulated annealing layout
 3. "Auto-route with Freerouting"          → Professional routing
 4. "Refill copper zones"                  → Ground/power pours
