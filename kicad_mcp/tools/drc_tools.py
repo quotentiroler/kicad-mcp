@@ -3,7 +3,7 @@ Design Rule Check (DRC) tools for KiCad PCB files.
 """
 import os
 from typing import Dict, Any
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.drc_history import save_drc_result, get_drc_history, compare_with_previous

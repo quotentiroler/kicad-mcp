@@ -8,7 +8,7 @@ import os
 import logging
 import subprocess
 from typing import Any
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.pcb_parser import (

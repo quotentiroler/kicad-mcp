@@ -42,11 +42,9 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    # <2: the code imports mcp.server.fastmcp, which 2.x renamed to
-    # mcp.server.mcpserver.  Unpinned, a fresh install cannot import
-    # this package at all.
-    "mcp[cli]>=1.0.0,<2",
-    "fastmcp>=2.0.0",
+    # 4.x: the whole codebase imports the standalone fastmcp, so mcp
+    # comes in transitively and is not a direct dependency.
+    "fastmcp>=4.0.0",
     "pandas>=2.0.0",
     "pyyaml>=6.0.0",
     "defusedxml>=0.7.0",  # Secure XML parsing
