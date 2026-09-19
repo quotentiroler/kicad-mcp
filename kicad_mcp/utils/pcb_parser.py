@@ -9,6 +9,8 @@ import logging
 import os
 import re
 
+from .sexpr import form_span, to_float
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,76 +67,6 @@ class PCBData:
     raw_content: str = ""  # Full file content for modification
 
 
-def parse_sexpr(text: str) -> list:
-    """Parse S-expression into nested Python lists."""
-    result = []
-    stack = [result]
-    current_token = ""
-    in_string = False
-
-    i = 0
-    while i < len(text):
-        char = text[i]
-
-        if char == '"' and (i == 0 or text[i - 1] != "\\"):
-            in_string = not in_string
-            current_token += char
-        elif in_string:
-            current_token += char
-        elif char == "(":
-            if current_token.strip():
-                stack[-1].append(current_token.strip())
-                current_token = ""
-            new_list = []
-            stack[-1].append(new_list)
-            stack.append(new_list)
-        elif char == ")":
-            if current_token.strip():
-                stack[-1].append(current_token.strip())
-                current_token = ""
-            if len(stack) > 1:
-                stack.pop()
-        elif char in " \t\n\r":
-            if current_token.strip():
-                stack[-1].append(current_token.strip())
-                current_token = ""
-        else:
-            current_token += char
-        i += 1
-
-    return result[0] if result else []
-
-
-def sexpr_to_string(sexpr: list, indent: int = 0) -> str:
-    """Convert nested Python list back to S-expression string."""
-    if not isinstance(sexpr, list):
-        return str(sexpr)
-
-    if not sexpr:
-        return "()"
-
-    # Check if this is a simple list (no nested lists)
-    has_nested = any(isinstance(item, list) for item in sexpr)
-
-    if not has_nested and len(sexpr) <= 4:
-        # Simple single-line format
-        items = " ".join(str(item) for item in sexpr)
-        return f"({items})"
-
-    # Multi-line format
-    lines = ["("]
-    for item in sexpr:
-        if isinstance(item, list):
-            lines.append("\t" * (indent + 1) + sexpr_to_string(item, indent + 1))
-        else:
-            if sexpr.index(item) == 0:
-                lines[0] += str(item)
-            else:
-                lines.append("\t" * (indent + 1) + str(item))
-    lines.append("\t" * indent + ")")
-    return "\n".join(lines)
-
-
 def parse_pcb_file(pcb_path: str) -> PCBData:
     """Parse a KiCad PCB file and extract key data.
 
@@ -149,6 +81,11 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
 
     with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
+
+    open_paren = content.find("(")
+    if open_paren == -1:
+        raise ValueError(f"Not a KiCad PCB file, no S-expression content: {pcb_path}")
+    form_span(content, open_paren)
 
     pcb = PCBData(raw_content=content)
 
@@ -172,35 +109,16 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
         re.DOTALL,
     )
     if outline_match:
-        x1, y1 = float(outline_match.group(1)), float(outline_match.group(2))
-        x2, y2 = float(outline_match.group(3)), float(outline_match.group(4))
+        x1, y1 = to_float(outline_match.group(1)), to_float(outline_match.group(2))
+        x2, y2 = to_float(outline_match.group(3)), to_float(outline_match.group(4))
         pcb.board_outline = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
 
     # Parse footprints
-    footprint_pattern = re.compile(
-        r'\(footprint\s+"([^"]+)"[^(]*'
-        r'(?:\(layer\s+"([^"]+)"\))?[^(]*'
-        r'(?:\(uuid\s+"([^"]+)"\))?[^(]*'
-        r"(?:\(at\s+([\d.-]+)\s+([\d.-]+)(?:\s+([\d.-]+))?\))?",
-        re.DOTALL,
-    )
-
     # More robust footprint parsing
     fp_starts = [m.start() for m in re.finditer(r'\(footprint\s+"', content)]
 
     for start in fp_starts:
-        # Find matching closing paren
-        depth = 0
-        end = start
-        for i in range(start, len(content)):
-            if content[i] == "(":
-                depth += 1
-            elif content[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-
+        _, end = form_span(content, start)
         fp_text = content[start:end]
 
         # Extract footprint library
@@ -216,8 +134,8 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
         # Extract position
         at_match = re.search(r"\(at\s+([\d.-]+)\s+([\d.-]+)(?:\s+([\d.-]+))?\)", fp_text)
         if at_match:
-            x, y = float(at_match.group(1)), float(at_match.group(2))
-            rot = float(at_match.group(3)) if at_match.group(3) else 0.0
+            x, y = to_float(at_match.group(1)), to_float(at_match.group(2))
+            rot = to_float(at_match.group(3))
         else:
             x, y, rot = 0.0, 0.0, 0.0
 
@@ -253,9 +171,9 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
     ):
         pcb.tracks.append(
             Track(
-                start=(float(match.group(1)), float(match.group(2))),
-                end=(float(match.group(3)), float(match.group(4))),
-                width=float(match.group(5)),
+                start=(to_float(match.group(1)), to_float(match.group(2))),
+                end=(to_float(match.group(3)), to_float(match.group(4))),
+                width=to_float(match.group(5)),
                 layer=match.group(6),
                 net=int(match.group(7)),
             )
@@ -272,9 +190,9 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
     ):
         pcb.vias.append(
             Via(
-                position=(float(match.group(1)), float(match.group(2))),
-                size=float(match.group(3)),
-                drill=float(match.group(4)),
+                position=(to_float(match.group(1)), to_float(match.group(2))),
+                size=to_float(match.group(3)),
+                drill=to_float(match.group(4)),
                 layers=(match.group(5), match.group(6)),
                 net=int(match.group(7)),
             )
@@ -483,10 +401,7 @@ def update_footprint_position(
     else:
         # Preserve existing rotation if not specified
         old_rot = at_match.group(3) if at_match.lastindex and at_match.lastindex >= 3 else None
-        if old_rot:
-            new_at = f"(at {x} {y} {old_rot})"
-        else:
-            new_at = f"(at {x} {y})"
+        new_at = f"(at {x} {y} {old_rot})" if old_rot else f"(at {x} {y})"
 
     new_content = content[:at_abs_start] + new_at + content[at_abs_end:]
 
@@ -552,248 +467,3 @@ def get_board_bounds(pcb: PCBData) -> tuple[float, float, float, float]:
         ys = [p[1] for p in pcb.board_outline]
         return (min(xs), min(ys), max(xs), max(ys))
     return (0, 0, 35, 25)  # Default SOM Band size
-
-
-def find_kicad_footprint_libraries() -> list[str]:
-    """Find KiCad footprint library paths on the system."""
-    import platform
-
-    paths = []
-    system = platform.system()
-
-    if system == "Windows":
-        # Standard KiCad installation paths on Windows
-        kicad_paths = [
-            r"C:\Program Files\KiCad\9.0\share\kicad\footprints",
-            r"C:\Program Files\KiCad\8.0\share\kicad\footprints",
-            r"C:\Program Files\KiCad\7.0\share\kicad\footprints",
-            r"C:\Program Files\KiCad\share\kicad\footprints",
-            os.path.expanduser(r"~\Documents\KiCad\9.0\footprints"),
-            os.path.expanduser(r"~\Documents\KiCad\8.0\footprints"),
-            os.path.expanduser(r"~\Documents\KiCad\7.0\footprints"),
-        ]
-    elif system == "Darwin":  # macOS
-        kicad_paths = [
-            "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
-            os.path.expanduser("~/Documents/KiCad/footprints"),
-        ]
-    else:  # Linux
-        kicad_paths = [
-            "/usr/share/kicad/footprints",
-            "/usr/local/share/kicad/footprints",
-            os.path.expanduser("~/.local/share/kicad/footprints"),
-        ]
-
-    for path in kicad_paths:
-        if os.path.isdir(path):
-            paths.append(path)
-
-    return paths
-
-
-def find_footprint_file(footprint_lib: str) -> str | None:
-    """Find a footprint file given a library:footprint string.
-
-    Args:
-        footprint_lib: Footprint identifier like "Package_QFN:QFN-48-1EP_7x7mm_P0.5mm"
-
-    Returns:
-        Path to .kicad_mod file or None if not found
-    """
-    if ":" not in footprint_lib:
-        return None
-
-    lib_name, fp_name = footprint_lib.split(":", 1)
-
-    lib_paths = find_kicad_footprint_libraries()
-
-    for base_path in lib_paths:
-        # Look for library folder (e.g., Package_QFN.pretty)
-        lib_folder = os.path.join(base_path, f"{lib_name}.pretty")
-        if os.path.isdir(lib_folder):
-            # Look for footprint file
-            fp_file = os.path.join(lib_folder, f"{fp_name}.kicad_mod")
-            if os.path.isfile(fp_file):
-                return fp_file
-
-    return None
-
-
-def read_footprint_from_library(footprint_lib: str) -> str | None:
-    """Read a footprint definition from KiCad libraries.
-
-    Args:
-        footprint_lib: Footprint identifier like "Package_QFN:QFN-48-1EP_7x7mm_P0.5mm"
-
-    Returns:
-        Footprint S-expression content or None if not found
-    """
-    fp_file = find_footprint_file(footprint_lib)
-
-    if fp_file is None:
-        logger.warning(f"Footprint not found in libraries: {footprint_lib}")
-        return None
-
-    try:
-        with open(fp_file, encoding="utf-8") as f:
-            content = f.read()
-        return content
-    except Exception as e:
-        logger.error(f"Error reading footprint file {fp_file}: {e}")
-        return None
-
-
-def create_full_footprint_sexpr(
-    reference: str,
-    footprint_lib: str,
-    position: tuple[float, float],
-    rotation: float = 0.0,
-    layer: str = "F.Cu",
-) -> str | None:
-    """Create a complete footprint S-expression by reading from library.
-
-    This reads the actual footprint definition from KiCad libraries
-    and modifies it with the correct reference, position, and layer.
-
-    Args:
-        reference: Component reference (e.g., "U1", "C1")
-        footprint_lib: Library:footprint identifier
-        position: (x, y) position on PCB
-        rotation: Rotation in degrees
-        layer: Target layer ("F.Cu" or "B.Cu")
-
-    Returns:
-        Complete footprint S-expression or None if library not found
-    """
-    # Try to read from library first
-    lib_content = read_footprint_from_library(footprint_lib)
-
-    if lib_content is None:
-        # Fall back to minimal footprint
-        logger.info(f"Using minimal footprint for {reference} (library not found)")
-        return create_footprint_sexpr(reference, footprint_lib, position, rotation, layer)
-
-    uuid = generate_uuid()
-    x, y = position
-    rot_str = f" {rotation}" if rotation != 0 else ""
-
-    # Modify the library footprint with our specifics
-    # Replace the footprint header
-    modified = re.sub(
-        r'\(footprint\s+"[^"]*"', f'(footprint "{footprint_lib}"', lib_content, count=1
-    )
-
-    # Update or add layer
-    if "(layer" in modified:
-        modified = re.sub(r'\(layer\s+"[^"]+"\)', f'(layer "{layer}")', modified, count=1)
-    else:
-        # Add layer after footprint name
-        modified = re.sub(
-            r'(\(footprint\s+"[^"]+")', f'\\1\n\t\t(layer "{layer}")', modified, count=1
-        )
-
-    # Update or add UUID
-    if "(uuid" in modified:
-        modified = re.sub(r'\(uuid\s+"[^"]+"\)', f'(uuid "{uuid}")', modified, count=1)
-    else:
-        modified = re.sub(r'(\(layer\s+"[^"]+"\))', f'\\1\n\t\t(uuid "{uuid}")', modified, count=1)
-
-    # Update or add position
-    if "(at " in modified:
-        modified = re.sub(
-            r"\(at\s+[\d.-]+\s+[\d.-]+(?:\s+[\d.-]+)?\)",
-            f"(at {x} {y}{rot_str})",
-            modified,
-            count=1,
-        )
-    else:
-        modified = re.sub(
-            r'(\(uuid\s+"[^"]+"\))', f"\\1\n\t\t(at {x} {y}{rot_str})", modified, count=1
-        )
-
-    # Update reference text
-    modified = re.sub(
-        r'\(fp_text\s+reference\s+"[^"]*"', f'(fp_text reference "{reference}"', modified, count=1
-    )
-
-    return modified
-
-
-def import_footprints_from_schematic(
-    pcb_path: str,
-    schematic_components: list[dict],
-    board_width: float = 35.0,
-    board_height: float = 25.0,
-) -> dict:
-    """Import footprints from schematic components into PCB.
-
-    Args:
-        pcb_path: Path to .kicad_pcb file
-        schematic_components: List of component dicts with 'reference', 'footprint' keys
-        board_width: Board width for initial placement grid
-        board_height: Board height for initial placement grid
-
-    Returns:
-        Dict with import results
-    """
-    with open(pcb_path, encoding="utf-8") as f:
-        content = f.read()
-
-    # Parse existing footprints to avoid duplicates
-    existing_refs = set()
-    for match in re.finditer(r'\(fp_text\s+reference\s+"([^"]+)"', content):
-        existing_refs.add(match.group(1))
-
-    # Calculate grid positions for new components
-    grid_cols = max(1, int(board_width / 5))  # 5mm spacing
-
-    added = []
-    skipped = []
-    failed = []
-
-    insert_pos = content.rfind(")")
-    new_footprints = []
-
-    for i, comp in enumerate(schematic_components):
-        ref = comp.get("reference", "")
-        footprint = comp.get("footprint", "")
-
-        if not ref or not footprint:
-            failed.append({"reference": ref, "reason": "Missing reference or footprint"})
-            continue
-
-        if ref in existing_refs:
-            skipped.append({"reference": ref, "reason": "Already exists in PCB"})
-            continue
-
-        # Calculate grid position (components start outside board, user arranges)
-        row = i // grid_cols
-        col = i % grid_cols
-        x = board_width + 10 + (col * 5)  # Place to right of board
-        y = 5 + (row * 5)
-
-        # Create footprint
-        fp_sexpr = create_full_footprint_sexpr(
-            reference=ref, footprint_lib=footprint, position=(x, y), rotation=0.0, layer="F.Cu"
-        )
-
-        if fp_sexpr:
-            new_footprints.append(fp_sexpr)
-            added.append({"reference": ref, "footprint": footprint, "position": (x, y)})
-        else:
-            failed.append({"reference": ref, "reason": "Could not create footprint"})
-
-    # Add all new footprints to PCB
-    if new_footprints:
-        all_footprints = "\n\n\t".join(new_footprints)
-        new_content = content[:insert_pos] + "\n\n\t" + all_footprints + "\n" + content[insert_pos:]
-
-        with open(pcb_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-
-    return {
-        "added": len(added),
-        "skipped": len(skipped),
-        "failed": len(failed),
-        "details": {"added": added, "skipped": skipped, "failed": failed},
-    }
