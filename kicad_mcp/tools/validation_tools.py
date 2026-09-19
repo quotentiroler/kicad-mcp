@@ -41,13 +41,16 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
         elif project_path.endswith(".kicad_pcb"):
             pcb_path = project_path
         else:
-            return {"success": False, "error": "Invalid file path. Must be .kicad_pro or .kicad_pcb"}
+            return {
+                "success": False,
+                "error": "Invalid file path. Must be .kicad_pro or .kicad_pcb",
+            }
 
         if not os.path.exists(pcb_path):
             return {"success": False, "error": f"PCB file not found: {pcb_path}"}
 
         # Create temp file for DRC output
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
             output_path = tmp.name
 
         if ctx:
@@ -59,7 +62,7 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
         except KiCadCLIError as e:
             return {"success": False, "error": str(e)}
         cmd = [kicad_cli, "pcb", "drc", "-o", output_path, pcb_path]
-        
+
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         except subprocess.TimeoutExpired:
@@ -72,11 +75,11 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
 
         # Parse output for violation counts
         stdout = result.stdout + result.stderr
-        
+
         # Extract counts from kicad-cli output
-        violations_match = re.search(r'Found (\d+) violations?', stdout)
-        unconnected_match = re.search(r'Found (\d+) unconnected items?', stdout)
-        
+        violations_match = re.search(r"Found (\d+) violations?", stdout)
+        unconnected_match = re.search(r"Found (\d+) unconnected items?", stdout)
+
         total_violations = int(violations_match.group(1)) if violations_match else 0
         unconnected_items = int(unconnected_match.group(1)) if unconnected_match else 0
 
@@ -84,22 +87,22 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
         violations_by_type = {}
         shorts = []
         clearance_violations = []
-        
+
         if os.path.exists(output_path):
-            with open(output_path, 'r') as f:
+            with open(output_path, "r") as f:
                 content = f.read()
-            
+
             # Parse violation types
             current_type = None
-            for line in content.split('\n'):
+            for line in content.split("\n"):
                 # Match violation type headers like [clearance]: or [short]:
-                type_match = re.match(r'\[(\w+)\]:', line)
+                type_match = re.match(r"\[(\w+)\]:", line)
                 if type_match:
                     current_type = type_match.group(1)
                     if current_type not in violations_by_type:
                         violations_by_type[current_type] = []
                     violations_by_type[current_type].append(line)
-                    
+
                     # Track shorts specifically
                     if current_type == "short":
                         shorts.append(line)
@@ -112,7 +115,9 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
         if ctx:
             await ctx.report_progress(100, 100)
             status = "PASS" if total_violations == 0 else "FAIL"
-            await ctx.info(f"DRC {status}: {total_violations} violations, {unconnected_items} unconnected items")
+            await ctx.info(
+                f"DRC {status}: {total_violations} violations, {unconnected_items} unconnected items"
+            )
 
         return {
             "success": True,
@@ -122,7 +127,7 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
             "shorts": len(shorts),
             "clearance_violations": len(clearance_violations),
             "violations_by_type": {k: len(v) for k, v in violations_by_type.items()},
-            "summary": f"DRC: {total_violations} violations ({len(shorts)} shorts, {len(clearance_violations)} clearance), {unconnected_items} unconnected"
+            "summary": f"DRC: {total_violations} violations ({len(shorts)} shorts, {len(clearance_violations)} clearance), {unconnected_items} unconnected",
         }
 
     except Exception as e:
@@ -401,11 +406,9 @@ def register_validation_tools(mcp: FastMCP) -> None:
     """Register validation tools with the MCP server."""
 
     @mcp.tool(name="run_drc")
-    async def run_drc_tool(
-        project_path: str, ctx: Context = None
-    ) -> dict[str, Any]:
+    async def run_drc_tool(project_path: str, ctx: Context = None) -> dict[str, Any]:
         """Run Design Rule Check (DRC) on a KiCad PCB.
-        
+
         Returns violations grouped by type including shorts, clearance, and unconnected items.
         """
         return await run_drc(project_path, ctx)

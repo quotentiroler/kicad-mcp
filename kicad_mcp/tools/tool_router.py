@@ -5,6 +5,7 @@ Organizes all registered tools into categories so AI clients can discover
 tools on demand rather than loading all schemas upfront. This reduces
 context window usage by ~70% for large tool inventories.
 """
+
 from typing import Any, Dict, List
 
 from fastmcp import FastMCP
@@ -156,10 +157,12 @@ def register_tool_router(mcp: FastMCP) -> None:
             cat_match = q in cat_info["description"].lower()
             for tool_name in cat_info["tools"]:
                 if q in tool_name.lower() or cat_match:
-                    matches.append({
-                        "tool": tool_name,
-                        "category": cat_name,
-                    })
+                    matches.append(
+                        {
+                            "tool": tool_name,
+                            "category": cat_name,
+                        }
+                    )
 
         return {
             "query": query,

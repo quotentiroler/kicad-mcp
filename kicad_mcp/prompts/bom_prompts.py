@@ -1,16 +1,17 @@
 """
 BOM-related prompt templates for KiCad.
 """
+
 from fastmcp import FastMCP
 
 
 def register_bom_prompts(mcp: FastMCP) -> None:
     """Register BOM-related prompt templates with the MCP server.
-    
+
     Args:
         mcp: The FastMCP server instance
     """
-    
+
     @mcp.prompt()
     def analyze_components() -> str:
         """Prompt for analyzing a KiCad project's components."""
@@ -27,7 +28,7 @@ def register_bom_prompts(mcp: FastMCP) -> None:
 
         Please use the BOM analysis tools to help me understand my component usage.
         """
-        
+
         return prompt
 
     @mcp.prompt()
@@ -53,7 +54,7 @@ def register_bom_prompts(mcp: FastMCP) -> None:
         
         If my BOM doesn't include cost data, please suggest how I might find pricing information for my components.
         """
-        
+
         return prompt
 
     @mcp.prompt()
@@ -72,7 +73,7 @@ def register_bom_prompts(mcp: FastMCP) -> None:
         
         Please guide me through the process of creating a well-structured BOM for my project.
         """
-        
+
         return prompt
 
     @mcp.prompt()
@@ -91,7 +92,7 @@ def register_bom_prompts(mcp: FastMCP) -> None:
         
         Please analyze my BOM and provide guidance on sourcing these components efficiently.
         """
-        
+
         return prompt
 
     @mcp.prompt()
@@ -113,5 +114,5 @@ def register_bom_prompts(mcp: FastMCP) -> None:
         
         Please analyze the BOMs from both projects and help me understand the differences between them.
         """
-        
+
         return prompt

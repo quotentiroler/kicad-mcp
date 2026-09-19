@@ -7,6 +7,7 @@ Supports nRF52840, STM32, and ESP32 SOC families.
 Extracts GPIO, I2C, SPI, and UART peripheral configurations by parsing
 schematic net names and component values.
 """
+
 import os
 import re
 from typing import Any, Dict, List, Optional
@@ -251,6 +252,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_binding(value: str) -> Optional[str]:
     """Find device tree compatible string for a component value."""
     if not value:
@@ -298,9 +300,7 @@ def _infer_bus_number(net_name: str) -> int:
     return 0
 
 
-def _discover_i2c_devices(
-    components: List[Dict], nets: Dict
-) -> List[Dict[str, Any]]:
+def _discover_i2c_devices(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
     """Discover I2C devices from schematic netlist data."""
     devices = []
     seen_refs = set()
@@ -320,8 +320,14 @@ def _discover_i2c_devices(
         is_i2c = False
         bus_num = 0
         for net_name, net_info in nets.items():
-            components_on_net = net_info if isinstance(net_info, list) else net_info.get("components", [])
-            refs_on_net = [c.get("ref", c.get("reference", "")) for c in components_on_net] if isinstance(components_on_net, list) else []
+            components_on_net = (
+                net_info if isinstance(net_info, list) else net_info.get("components", [])
+            )
+            refs_on_net = (
+                [c.get("ref", c.get("reference", "")) for c in components_on_net]
+                if isinstance(components_on_net, list)
+                else []
+            )
 
             if ref in refs_on_net and _infer_bus_type(net_name) == "I2C":
                 is_i2c = True
@@ -330,20 +336,20 @@ def _discover_i2c_devices(
 
         if is_i2c or binding:
             seen_refs.add(ref)
-            devices.append({
-                "reference": ref,
-                "value": value,
-                "compatible": binding or f"vendor,{value.lower()}",
-                "address": addr,
-                "bus": bus_num,
-            })
+            devices.append(
+                {
+                    "reference": ref,
+                    "value": value,
+                    "compatible": binding or f"vendor,{value.lower()}",
+                    "address": addr,
+                    "bus": bus_num,
+                }
+            )
 
     return devices
 
 
-def _discover_spi_devices(
-    components: List[Dict], nets: Dict
-) -> List[Dict[str, Any]]:
+def _discover_spi_devices(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
     """Discover SPI devices from schematic netlist data."""
     devices = []
     seen_refs = set()
@@ -360,8 +366,14 @@ def _discover_spi_devices(
         cs_index = 0
 
         for net_name, net_info in nets.items():
-            components_on_net = net_info if isinstance(net_info, list) else net_info.get("components", [])
-            refs_on_net = [c.get("ref", c.get("reference", "")) for c in components_on_net] if isinstance(components_on_net, list) else []
+            components_on_net = (
+                net_info if isinstance(net_info, list) else net_info.get("components", [])
+            )
+            refs_on_net = (
+                [c.get("ref", c.get("reference", "")) for c in components_on_net]
+                if isinstance(components_on_net, list)
+                else []
+            )
 
             if ref in refs_on_net and _infer_bus_type(net_name) == "SPI":
                 is_spi = True
@@ -370,14 +382,16 @@ def _discover_spi_devices(
 
         if is_spi and binding:
             seen_refs.add(ref)
-            devices.append({
-                "reference": ref,
-                "value": value,
-                "compatible": binding,
-                "bus": bus_num,
-                "cs": cs_index,
-                "frequency": 8000000,
-            })
+            devices.append(
+                {
+                    "reference": ref,
+                    "value": value,
+                    "compatible": binding,
+                    "bus": bus_num,
+                    "cs": cs_index,
+                    "frequency": 8000000,
+                }
+            )
 
     return devices
 
@@ -392,9 +406,7 @@ def _discover_uart_peripherals(nets: Dict) -> List[Dict[str, Any]]:
     return [{"bus": n} for n in sorted(uart_buses)]
 
 
-def _discover_gpio_pins(
-    components: List[Dict], nets: Dict
-) -> List[Dict[str, Any]]:
+def _discover_gpio_pins(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
     """Discover GPIO pin assignments from net names."""
     gpio_pins = []
     gpio_pattern = re.compile(r"P(\d+)\.(\d+)|GPIO(\d+)", re.IGNORECASE)
@@ -405,20 +417,24 @@ def _discover_gpio_pins(
             if m.group(1) is not None:
                 port = int(m.group(1))
                 pin = int(m.group(2))
-                gpio_pins.append({
-                    "net": net_name,
-                    "port": port,
-                    "pin": pin,
-                    "label": net_name,
-                })
+                gpio_pins.append(
+                    {
+                        "net": net_name,
+                        "port": port,
+                        "pin": pin,
+                        "label": net_name,
+                    }
+                )
             elif m.group(3) is not None:
                 gpio_num = int(m.group(3))
-                gpio_pins.append({
-                    "net": net_name,
-                    "port": gpio_num // 32,
-                    "pin": gpio_num % 32,
-                    "label": net_name,
-                })
+                gpio_pins.append(
+                    {
+                        "net": net_name,
+                        "port": gpio_num // 32,
+                        "pin": gpio_num % 32,
+                        "label": net_name,
+                    }
+                )
 
     return gpio_pins
 
@@ -466,13 +482,15 @@ def _render_device_tree(
     for bus_num, devs in sorted(i2c_by_bus.items()):
         bus_label = f"i2c{bus_num}"
         lines.append(f"&{bus_label} {{")
-        lines.append("\tstatus = \"okay\";")
+        lines.append('\tstatus = "okay";')
         lines.append("")
 
         for dev in devs:
             addr_hex = f"0x{dev['address']:02x}"
             ref_lower = dev["reference"].lower()
-            lines.append(f"\t{ref_lower}: {dev['compatible'].split(',')[-1]}@{dev['address']:02x} {{")
+            lines.append(
+                f"\t{ref_lower}: {dev['compatible'].split(',')[-1]}@{dev['address']:02x} {{"
+            )
             lines.append(f'\t\tcompatible = "{dev["compatible"]}";')
             lines.append(f"\t\treg = <{addr_hex}>;")
             lines.append(f'\t\tlabel = "{dev["value"]}";')
@@ -490,7 +508,7 @@ def _render_device_tree(
     for bus_num, devs in sorted(spi_by_bus.items()):
         bus_label = f"spi{bus_num}"
         lines.append(f"&{bus_label} {{")
-        lines.append("\tstatus = \"okay\";")
+        lines.append('\tstatus = "okay";')
         lines.append("")
 
         for dev in devs:
@@ -510,7 +528,7 @@ def _render_device_tree(
     for uart in uart_devices:
         bus_label = f"uart{uart['bus']}"
         lines.append(f"&{bus_label} {{")
-        lines.append("\tstatus = \"okay\";")
+        lines.append('\tstatus = "okay";')
         lines.append("\tcurrent-speed = <115200>;")
         lines.append("};")
         lines.append("")
