@@ -39,17 +39,21 @@ def test_detect_finds_versioned_path_when_not_on_PATH():
     m = _manager("Windows")
     target = r"C:\Program Files\KiCad\9.0\bin\kicad-cli.exe"
 
-    with mock.patch.dict(os.environ, {}, clear=True), \
-         mock.patch("shutil.which", return_value=None), \
-         mock.patch("os.path.isfile", side_effect=lambda p: p == target), \
-         mock.patch("os.access", return_value=True):
+    with (
+        mock.patch.dict(os.environ, {}, clear=True),
+        mock.patch("shutil.which", return_value=None),
+        mock.patch("os.path.isfile", side_effect=lambda p: p == target),
+        mock.patch("os.access", return_value=True),
+    ):
         assert m._detect_cli_path() == target
 
 
 def test_env_override_still_wins():
     """KICAD_CLI_PATH is checked before anything else."""
     m = _manager("Linux")
-    with mock.patch.dict(os.environ, {"KICAD_CLI_PATH": "/opt/mine/kicad-cli"}), \
-         mock.patch("os.path.isfile", return_value=True), \
-         mock.patch("os.access", return_value=True):
+    with (
+        mock.patch.dict(os.environ, {"KICAD_CLI_PATH": "/opt/mine/kicad-cli"}),
+        mock.patch("os.path.isfile", return_value=True),
+        mock.patch("os.access", return_value=True),
+    ):
         assert m._detect_cli_path() == "/opt/mine/kicad-cli"
