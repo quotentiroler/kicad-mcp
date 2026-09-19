@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP, Context, Image
 
 from kicad_mcp.utils.file_utils import get_project_files
+from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 
 def register_bom_tools(mcp: FastMCP) -> None:
     """Register BOM-related tools with the MCP server.
@@ -649,74 +650,24 @@ async def export_bom_with_cli(schematic_file: str, output_dir: str, project_name
     # Output file path
     output_file = os.path.join(output_dir, f"{project_name}_bom.csv")
     
-    # Define the command based on operating system
-    if system == "Darwin":  # macOS
-        from kicad_mcp.config import KICAD_APP_PATH
-        
-        # Path to KiCad command-line tools on macOS
-        kicad_cli = os.path.join(KICAD_APP_PATH, "Contents/MacOS/kicad-cli")
-        
-        if not os.path.exists(kicad_cli):
-            return {
-                "success": False,
-                "error": f"KiCad CLI tool not found at {kicad_cli}",
-                "schematic_file": schematic_file
-            }
-        
-        # Command to generate BOM
-        cmd = [
-            kicad_cli,
-            "sch",
-            "export",
-            "bom",
-            "--output", output_file,
-            schematic_file
-        ]
-    
-    elif system == "Windows":
-        from kicad_mcp.config import KICAD_APP_PATH
-        
-        # Path to KiCad command-line tools on Windows
-        kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-        
-        if not os.path.exists(kicad_cli):
-            return {
-                "success": False,
-                "error": f"KiCad CLI tool not found at {kicad_cli}",
-                "schematic_file": schematic_file
-            }
-        
-        # Command to generate BOM
-        cmd = [
-            kicad_cli,
-            "sch",
-            "export",
-            "bom",
-            "--output", output_file,
-            schematic_file
-        ]
-    
-    elif system == "Linux":
-        # Assume kicad-cli is in the PATH
-        kicad_cli = "kicad-cli"
-        
-        # Command to generate BOM
-        cmd = [
-            kicad_cli,
-            "sch",
-            "export",
-            "bom",
-            "--output", output_file,
-            schematic_file
-        ]
-    
-    else:
+    try:
+        kicad_cli = get_kicad_cli_path()
+    except KiCadCLIError as e:
         return {
             "success": False,
-            "error": f"Unsupported operating system: {system}",
+            "error": str(e),
             "schematic_file": schematic_file
         }
-    
+
+    cmd = [
+        kicad_cli,
+        "sch",
+        "export",
+        "bom",
+        "--output", output_file,
+        schematic_file
+    ]
+
     try:
         print(f"Running command: {' '.join(cmd)}")
         if ctx:

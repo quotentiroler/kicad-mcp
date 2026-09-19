@@ -15,6 +15,9 @@ from ..config import TIMEOUT_CONSTANTS
 
 logger = logging.getLogger(__name__)
 
+# Newest first, so a machine with two installs gets the newer one.
+WINDOWS_VERSIONS = ("9.0", "8.0", "7.0")
+
 
 class KiCadCLIError(Exception):
     """Raised when KiCad CLI operations fail."""
@@ -168,6 +171,15 @@ class KiCadCLIManager:
                 ]
             )
         elif self._system == "Windows":
+            # Versioned first: KiCad installs into KiCad\<version>\bin, so the
+            # unversioned path alone finds nothing on a normal machine.
+            for version in WINDOWS_VERSIONS:
+                paths.extend(
+                    [
+                        rf"C:\Program Files\KiCad\{version}\bin\kicad-cli.exe",
+                        rf"C:\Program Files (x86)\KiCad\{version}\bin\kicad-cli.exe",
+                    ]
+                )
             paths.extend(
                 [
                     r"C:\Program Files\KiCad\bin\kicad-cli.exe",
