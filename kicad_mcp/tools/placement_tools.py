@@ -18,6 +18,7 @@ Key optimization targets:
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import json
 import math
 from pathlib import Path
 import random
