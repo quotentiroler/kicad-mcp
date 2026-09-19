@@ -13,6 +13,59 @@ from fastmcp.utilities.types import Image
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 
+LINEAR_KINDS = ("R", "C", "L")
+SOURCE_KINDS = ("V", "I")
+
+
+def summarise_spice_netlist(text: str) -> dict[str, Any]:
+    """What the exported deck can and cannot be used for.
+
+    kicad-cli writes connectivity and values out mechanically, which says
+    nothing about whether the result is a circuit a solver can answer
+    for. A sheet full of silicon exports the same way a passive one does:
+    the parts with no model become a bare reference, the nets that only
+    reached those parts are left dangling, and there is no stimulus. A
+    caller holding the file cannot tell any of that from its size.
+    """
+    devices: dict[str, int] = {}
+    unmodelled: list[str] = []
+    nodes: set[str] = set()
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith((".", "*", ";")):
+            continue
+        fields = line.split()
+        ref = fields[0]
+        if len(fields) == 2 and fields[1].startswith("__"):
+            unmodelled.append(ref)
+            continue
+        if len(fields) < 3:
+            continue
+        kind = ref[0].upper()
+        devices[kind] = devices.get(kind, 0) + 1
+        nodes.update(fields[1:3])
+
+    ground = "0" if "0" in nodes else ("GND" if "GND" in nodes else None)
+    blockers = []
+    if not any(devices.get(k) for k in SOURCE_KINDS):
+        blockers.append("no voltage source, so there is nothing to drive it")
+    if ground != "0":
+        named = f'the ground net is "{ground}"' if ground else "no ground net"
+        blockers.append(f"{named}, and SPICE takes node 0 as the reference")
+    if unmodelled:
+        blockers.append(f"{len(unmodelled)} parts have no model: {', '.join(sorted(unmodelled))}")
+
+    return {
+        "devices": devices,
+        "linear_devices": sum(devices.get(k, 0) for k in LINEAR_KINDS),
+        "unmodelled": sorted(unmodelled),
+        "ground_node": ground,
+        "unconnected_nets": sum(1 for n in nodes if n.startswith("unconnected")),
+        "simulatable": not blockers,
+        "blockers": blockers,
+    }
+
 
 def register_export_tools(mcp: FastMCP) -> None:
     """Register export tools with the MCP server.
@@ -403,7 +456,10 @@ def register_export_tools(mcp: FastMCP) -> None:
             output_file: Output .cir path (default: alongside the schematic)
 
         Returns:
-            Dictionary with export results and the file path
+            The file path, and what is in it: the devices by kind, the
+            references that came out with no model, and whether the deck
+            can be simulated at all, with a reason for each thing that
+            stops it.
         """
         files = get_project_files(project_path)
         if "schematic" not in files:
@@ -439,10 +495,14 @@ def register_export_tools(mcp: FastMCP) -> None:
             if not os.path.exists(output_file):
                 return {"error": "Netlist export reported success but wrote no file"}
 
+            with open(output_file, encoding="utf-8") as f:
+                summary = summarise_spice_netlist(f.read())
+
             return {
                 "success": True,
                 "output_file": output_file,
                 "size_bytes": os.path.getsize(output_file),
+                **summary,
             }
 
         except subprocess.TimeoutExpired:
