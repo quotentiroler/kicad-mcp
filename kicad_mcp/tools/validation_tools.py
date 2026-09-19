@@ -15,32 +15,8 @@ from typing import Any
 from fastmcp import Context, FastMCP
 
 from kicad_mcp.utils.boundary_validator import BoundaryValidator
+from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 from kicad_mcp.utils.file_utils import get_project_files
-
-
-def find_kicad_cli() -> str:
-    """Find kicad-cli executable path."""
-    import platform
-    
-    if platform.system() == "Windows":
-        # Check common Windows installation paths
-        possible_paths = [
-            r"C:\Program Files\KiCad\9.0\bin\kicad-cli.exe",
-            r"C:\Program Files\KiCad\8.0\bin\kicad-cli.exe",
-            r"C:\Program Files\KiCad\7.0\bin\kicad-cli.exe",
-            r"C:\Program Files (x86)\KiCad\9.0\bin\kicad-cli.exe",
-        ]
-        for path in possible_paths:
-            if os.path.exists(path):
-                return path
-    else:
-        # Linux/macOS - check PATH
-        import shutil
-        kicad_cli = shutil.which("kicad-cli")
-        if kicad_cli:
-            return kicad_cli
-    
-    return "kicad-cli"  # Fallback to PATH lookup
 
 
 async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
@@ -78,7 +54,10 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
             await ctx.report_progress(30, 100)
 
         # Run kicad-cli DRC
-        kicad_cli = find_kicad_cli()
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"success": False, "error": str(e)}
         cmd = [kicad_cli, "pcb", "drc", "-o", output_path, pcb_path]
         
         try:

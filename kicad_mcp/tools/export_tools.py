@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP, Context, Image
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.config import KICAD_APP_PATH, system
+from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 
 def register_export_tools(mcp: FastMCP) -> None:
     """Register export tools with the MCP server.
@@ -114,16 +115,10 @@ def register_export_tools(mcp: FastMCP) -> None:
         
         pcb_path = files["pcb"]
         
-        # Find kicad-cli for zone refill
-        if system == "Windows":
-            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-        elif system == "Darwin":
-            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-        else:
-            kicad_cli = "kicad-cli"
-        
-        if not os.path.exists(kicad_cli) and system != "Linux":
-            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
         
         try:
             # Use kicad-cli to export DRC which triggers zone refill
@@ -140,11 +135,14 @@ def register_export_tools(mcp: FastMCP) -> None:
             ]
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            
+
             # Clean up temp file
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-            
+
+            if result.returncode != 0:
+                return {"error": f"Zone refill failed: {result.stderr}"}
+
             return {
                 "success": True,
                 "message": "Zones refilled via DRC check",
@@ -184,16 +182,10 @@ def register_export_tools(mcp: FastMCP) -> None:
         
         os.makedirs(output_dir, exist_ok=True)
         
-        # Find kicad-cli
-        if system == "Windows":
-            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-        elif system == "Darwin":
-            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-        else:
-            kicad_cli = "kicad-cli"
-        
-        if not os.path.exists(kicad_cli) and system != "Linux":
-            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
         
         try:
             cmd = [
@@ -250,16 +242,10 @@ def register_export_tools(mcp: FastMCP) -> None:
         
         os.makedirs(output_dir, exist_ok=True)
         
-        # Find kicad-cli
-        if system == "Windows":
-            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-        elif system == "Darwin":
-            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-        else:
-            kicad_cli = "kicad-cli"
-        
-        if not os.path.exists(kicad_cli) and system != "Linux":
-            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
         
         try:
             cmd = [
@@ -316,16 +302,10 @@ def register_export_tools(mcp: FastMCP) -> None:
         
         os.makedirs(output_dir, exist_ok=True)
         
-        # Find kicad-cli
-        if system == "Windows":
-            kicad_cli = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-        elif system == "Darwin":
-            kicad_cli = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-        else:
-            kicad_cli = "kicad-cli"
-        
-        if not os.path.exists(kicad_cli) and system != "Linux":
-            return {"error": f"kicad-cli not found at {kicad_cli}"}
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
         
         try:
             cmd = [
@@ -356,6 +336,123 @@ def register_export_tools(mcp: FastMCP) -> None:
         except Exception as e:
             return {"error": f"Failed to export PnP file: {str(e)}"}
 
+    @mcp.tool()
+    async def export_step(
+        project_path: str,
+        output_file: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Export the board as a STEP model for mechanical CAD.
+
+        Needs the 3D models wired to the footprints, and a board thickness
+        set in the stackup - a deck with the default thickness exports a
+        board of the wrong height, which is exactly what an enclosure check
+        is meant to catch.
+
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            output_file: Output .step path (default: alongside the PCB)
+
+        Returns:
+            Dictionary with export results and the file path
+        """
+        files = get_project_files(project_path)
+        if "pcb" not in files:
+            return {"error": "PCB file not found in project"}
+
+        pcb_path = files["pcb"]
+        if output_file is None:
+            base = os.path.splitext(pcb_path)[0]
+            output_file = f"{base}.step"
+
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
+
+        try:
+            cmd = [
+                kicad_cli, "pcb", "export", "step",
+                "--output", output_file,
+                "--subst-models",
+                pcb_path
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+            if result.returncode != 0:
+                return {"error": f"STEP export failed: {result.stderr}"}
+            if not os.path.exists(output_file):
+                return {"error": "STEP export reported success but wrote no file"}
+
+            return {
+                "success": True,
+                "output_file": output_file,
+                "size_bytes": os.path.getsize(output_file)
+            }
+
+        except subprocess.TimeoutExpired:
+            return {"error": "STEP export timed out"}
+        except Exception as e:
+            return {"error": f"Failed to export STEP: {str(e)}"}
+
+    @mcp.tool()
+    async def export_spice_netlist(
+        project_path: str,
+        output_file: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Export the schematic as a SPICE netlist for simulation.
+
+        Connectivity and values come out mechanically; active parts still
+        need their own model cards, so a passive or linear sheet exports
+        ready to simulate and anything with a diode in it does not.
+
+        Args:
+            project_path: Path to the KiCad project file (.kicad_pro)
+            output_file: Output .cir path (default: alongside the schematic)
+
+        Returns:
+            Dictionary with export results and the file path
+        """
+        files = get_project_files(project_path)
+        if "schematic" not in files:
+            return {"error": "Schematic file not found in project"}
+
+        sch_path = files["schematic"]
+        if output_file is None:
+            base = os.path.splitext(sch_path)[0]
+            output_file = f"{base}.cir"
+
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            return {"error": str(e)}
+
+        try:
+            cmd = [
+                kicad_cli, "sch", "export", "netlist",
+                "--format", "spice",
+                "--output", output_file,
+                sch_path
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+            if result.returncode != 0:
+                return {"error": f"SPICE netlist export failed: {result.stderr}"}
+            if not os.path.exists(output_file):
+                return {"error": "Netlist export reported success but wrote no file"}
+
+            return {
+                "success": True,
+                "output_file": output_file,
+                "size_bytes": os.path.getsize(output_file)
+            }
+
+        except subprocess.TimeoutExpired:
+            return {"error": "SPICE netlist export timed out"}
+        except Exception as e:
+            return {"error": f"Failed to export SPICE netlist: {str(e)}"}
+
     # generate_project_thumbnail removed - was just an alias for generate_pcb_thumbnail
 
 # Helper functions for thumbnail generation
@@ -382,34 +479,10 @@ async def generate_thumbnail_with_cli(pcb_file: str, ctx: Context = None):
         # --------------------------- 
 
         # Check for required command-line tools based on OS
-        kicad_cli = None
-        if system == "Darwin":  # macOS
-            kicad_cli_path = os.path.join(KICAD_APP_PATH, "Contents/MacOS/kicad-cli")
-            if os.path.exists(kicad_cli_path):
-                 kicad_cli = kicad_cli_path
-            elif shutil.which("kicad-cli") is not None:
-                kicad_cli = "kicad-cli"  # Try to use from PATH
-            else:
-                print(f"kicad-cli not found at {kicad_cli_path} or in PATH")
-                return None
-        elif system == "Windows":
-            kicad_cli_path = os.path.join(KICAD_APP_PATH, "bin", "kicad-cli.exe")
-            if os.path.exists(kicad_cli_path):
-                 kicad_cli = kicad_cli_path
-            elif shutil.which("kicad-cli.exe") is not None:
-                 kicad_cli = "kicad-cli.exe"
-            elif shutil.which("kicad-cli") is not None:
-                kicad_cli = "kicad-cli"  # Try to use from PATH (without .exe)
-            else:
-                print(f"kicad-cli not found at {kicad_cli_path} or in PATH")
-                return None
-        elif system == "Linux":
-            kicad_cli = shutil.which("kicad-cli")
-            if not kicad_cli:
-                print("kicad-cli not found in PATH")
-                return None
-        else:
-            print(f"Unsupported operating system: {system}")
+        try:
+            kicad_cli = get_kicad_cli_path()
+        except KiCadCLIError as e:
+            print(str(e))
             return None
 
         if ctx:
