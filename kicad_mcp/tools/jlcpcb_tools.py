@@ -14,6 +14,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
+from kicad_mcp.utils.sexpr import form_end
 
 # JLCPCB BOM columns
 JLCPCB_BOM_HEADER = ["Comment", "Designator", "Footprint", "LCSC Part #"]
@@ -133,16 +134,9 @@ def _parse_pcb_components(pcb_path: str) -> list[dict[str, Any]]:
         footprint_lib = match.group(1)
 
         # Find the balanced closing paren
-        depth = 0
-        fp_end = fp_start
-        for i in range(fp_start, len(content)):
-            if content[i] == "(":
-                depth += 1
-            elif content[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    fp_end = i + 1
-                    break
+        fp_end = form_end(content, fp_start)
+        if fp_end is None:
+            break
 
         block = content[fp_start:fp_end]
         pos = fp_end

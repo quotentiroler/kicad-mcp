@@ -13,6 +13,8 @@ import os
 import re
 from typing import Any
 
+from .sexpr import form_end
+
 
 class ConnectivityAnalyzer:
     """Analyzes wire-to-pin connectivity in KiCad schematics using coordinate matching."""
@@ -88,16 +90,7 @@ class ConnectivityAnalyzer:
             return
 
         # Find the end of lib_symbols by tracking parentheses
-        depth = 0
-        lib_end = lib_start
-        for i, char in enumerate(self.content[lib_start:], lib_start):
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0:
-                    lib_end = i + 1
-                    break
+        lib_end = form_end(self.content, lib_start) or lib_start
 
         lib_section = self.content[lib_start:lib_end]
 
@@ -116,16 +109,7 @@ class ConnectivityAnalyzer:
             symbol_start = match.start()
 
             # Find the symbol's extent
-            depth = 0
-            symbol_end = symbol_start
-            for i, char in enumerate(lib_section[symbol_start:], symbol_start):
-                if char == "(":
-                    depth += 1
-                elif char == ")":
-                    depth -= 1
-                    if depth == 0:
-                        symbol_end = i + 1
-                        break
+            symbol_end = form_end(lib_section, symbol_start) or symbol_start
 
             symbol_content = lib_section[symbol_start:symbol_end]
 
@@ -150,15 +134,7 @@ class ConnectivityAnalyzer:
         lib_end = 0
         lib_start = self.content.find("(lib_symbols")
         if lib_start != -1:
-            depth = 0
-            for i, char in enumerate(self.content[lib_start:], lib_start):
-                if char == "(":
-                    depth += 1
-                elif char == ")":
-                    depth -= 1
-                    if depth == 0:
-                        lib_end = i + 1
-                        break
+            lib_end = form_end(self.content, lib_start) or 0
 
         # Find component instances (symbols with lib_id)
         instance_content = self.content[lib_end:]
@@ -171,16 +147,7 @@ class ConnectivityAnalyzer:
             symbol_start = match.start()
 
             # Find the symbol's full extent
-            depth = 0
-            symbol_end = symbol_start
-            for i, char in enumerate(instance_content[symbol_start:], symbol_start):
-                if char == "(":
-                    depth += 1
-                elif char == ")":
-                    depth -= 1
-                    if depth == 0:
-                        symbol_end = i + 1
-                        break
+            symbol_end = form_end(instance_content, symbol_start) or symbol_start
 
             symbol_content = instance_content[symbol_start:symbol_end]
 
@@ -312,7 +279,9 @@ class ConnectivityAnalyzer:
                 end_x, end_y = wire["end"]["x"], wire["end"]["y"]
 
                 # Check if wire starts or ends at this pin
-                if self._coords_match(start_x, start_y, pin_x, pin_y) or self._coords_match(end_x, end_y, pin_x, pin_y):
+                if self._coords_match(start_x, start_y, pin_x, pin_y) or self._coords_match(
+                    end_x, end_y, pin_x, pin_y
+                ):
                     self.wire_connections[pin_key].append(wire["id"])
                     connected = True
 

@@ -105,6 +105,14 @@ def form_span(text: str, start: int) -> tuple[int, int]:
     raise ValueError(f"form opening at offset {start} is never closed")
 
 
+def form_end(text: str, start: int) -> int | None:
+    """End offset of the form opening at `start`, or None if it never closes."""
+    try:
+        return form_span(text, start)[1]
+    except ValueError:
+        return None
+
+
 def sexpr_to_string(sexpr: list, indent: int = 0) -> str:
     """Render nested lists back to S-expression text."""
     if not isinstance(sexpr, list):

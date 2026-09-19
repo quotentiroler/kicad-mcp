@@ -20,6 +20,7 @@ from kicad_mcp.utils.pcb_parser import (
     generate_uuid,
     parse_pcb_file,
 )
+from kicad_mcp.utils.sexpr import form_end
 
 logger = logging.getLogger(__name__)
 
@@ -102,16 +103,9 @@ def extract_pads_from_pcb(pcb: PCBData) -> list[Pad]:
 
         for start in pad_starts:
             # Find matching closing paren for this pad
-            depth = 0
-            end = start
-            for i in range(start, len(fp.raw_sexpr)):
-                if fp.raw_sexpr[i] == "(":
-                    depth += 1
-                elif fp.raw_sexpr[i] == ")":
-                    depth -= 1
-                    if depth == 0:
-                        end = i + 1
-                        break
+            end = form_end(fp.raw_sexpr, start)
+            if end is None:
+                continue
 
             pad_text = fp.raw_sexpr[start:end]
 
@@ -1209,25 +1203,8 @@ def _find_balanced_sexp(content: str, start_idx: int) -> int:
     if start_idx >= len(content) or content[start_idx] != "(":
         return -1
 
-    depth = 0
-    in_string = False
-    i = start_idx
-
-    while i < len(content):
-        char = content[i]
-
-        if char == '"' and (i == 0 or content[i - 1] != "\\"):
-            in_string = not in_string
-        elif not in_string:
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0:
-                    return i + 1
-        i += 1
-
-    return -1  # Unbalanced
+    end = form_end(content, start_idx)
+    return -1 if end is None else end
 
 
 def _remove_sexps_by_type(content: str, sexp_type: str) -> tuple[str, int]:

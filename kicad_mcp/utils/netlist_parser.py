@@ -7,6 +7,8 @@ import os
 import re
 from typing import Any
 
+from .sexpr import form_end
+
 
 class SchematicParser:
     """Parser for KiCad schematic files to extract netlist information."""
@@ -108,36 +110,10 @@ class SchematicParser:
             List of matching S-expressions
         """
         matches = []
-        positions = []
-
-        # Find all starting positions of matches
         for match in re.finditer(pattern, self.content):
-            positions.append(match.start())
-
-        # Extract full S-expressions for each match
-        for pos in positions:
-            # Start from the matching position
-            current_pos = pos
-            depth = 0
-            s_exp = ""
-
-            # Extract the full S-expression by tracking parentheses
-            while current_pos < len(self.content):
-                char = self.content[current_pos]
-                s_exp += char
-
-                if char == "(":
-                    depth += 1
-                elif char == ")":
-                    depth -= 1
-                    if depth == 0:
-                        # Found the end of the S-expression
-                        break
-
-                current_pos += 1
-
-            matches.append(s_exp)
-
+            end = form_end(self.content, match.start())
+            if end is not None:
+                matches.append(self.content[match.start() : end])
         return matches
 
     def _extract_components(self) -> None:
@@ -149,16 +125,7 @@ class SchematicParser:
         lib_symbols_match = re.search(r"\(lib_symbols\s*", self.content)
         if lib_symbols_match:
             # Find the closing parenthesis of lib_symbols
-            start_pos = lib_symbols_match.start()
-            depth = 0
-            for i, char in enumerate(self.content[start_pos:], start_pos):
-                if char == "(":
-                    depth += 1
-                elif char == ")":
-                    depth -= 1
-                    if depth == 0:
-                        lib_symbols_end = i + 1
-                        break
+            lib_symbols_end = form_end(self.content, lib_symbols_match.start()) or 0
             print(f"lib_symbols section ends at position {lib_symbols_end}")
 
         # Extract symbol INSTANCES only (they have lib_id attribute)

@@ -1,8 +1,10 @@
 """Tests for the S-expression reader."""
 
+from pathlib import Path
+
 import pytest
 
-from kicad_mcp.utils.sexpr import parse_sexpr, sexpr_to_string, split_forms
+from kicad_mcp.utils.sexpr import form_end, parse_sexpr, sexpr_to_string, split_forms
 
 BACKSLASH = chr(92)
 
@@ -67,6 +69,29 @@ def test_token_equal_to_head_is_not_hoisted_onto_the_head_line():
     out = sexpr_to_string(["net", ["a", "b"], "net"])
     assert "netnet" not in out
     assert parse_sexpr(out) == ["net", ["a", "b"], "net"]
+
+
+def test_form_end_reports_a_form_that_never_closes():
+    assert form_end('(footprint "R" (at 1 2))', 0) == 24
+    assert form_end('(footprint "R" (at 1 2)', 0) is None
+
+
+def test_no_module_hand_rolls_its_own_bracket_scanner():
+    """Counting brackets without knowing where the strings are loses data.
+
+    Eight copies of that loop across four modules each dropped whatever
+    followed an unmatched paren in a quoted value. form_span is the one
+    that knows about strings and escapes, so nothing should grow a
+    private replacement for it.
+    """
+    package = Path(__file__).resolve().parents[3] / "kicad_mcp"
+    offenders = [
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*.py")
+        if path.name != "sexpr.py" and 'char == "("' in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
 
 
 @pytest.mark.parametrize(
