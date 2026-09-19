@@ -7,7 +7,7 @@ context window usage by ~70% for large tool inventories.
 """
 from typing import Any, Dict, List
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 
 # Tool category definitions with descriptions and member tool names

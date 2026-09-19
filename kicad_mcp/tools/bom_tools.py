@@ -6,7 +6,7 @@ import csv
 import json
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
-from mcp.server.fastmcp import FastMCP, Context, Image
+from fastmcp import Context, FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
