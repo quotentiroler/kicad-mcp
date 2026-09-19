@@ -18,8 +18,8 @@
 | **JLCPCB BOM export** | — | ✅ Assembly-ready BOM + CPL |
 | **nRF52 device tree generation** | — | ✅ Zephyr .dts from schematic |
 | **Tool router (token savings)** | — | ✅ Category-based discovery |
-| **Python 3.9 compat** | ❌ (`X \| None`) | ✅ (`X = None`) |
-| **KiCad 9.0 paths** | Partial | ✅ Versioned discovery |
+| **KiCad 9.0 paths** | Partial | ✅ Versioned discovery, in one place |
+| **STEP + SPICE export** | — | ✅ Enclosure checks and simulation |
 
 ## Tool Categories (~40 tools)
 
@@ -49,6 +49,8 @@
 - `export_drill` — Excellon drill files
 - `export_pos` — Pick-and-place position files
 - `export_jlcpcb_bom` — JLCPCB-format BOM + CPL files
+- `export_step` — STEP model of the board, for checking it against an enclosure
+- `export_spice_netlist` — SPICE netlist from the schematic, for simulation
 - `generate_pcb_thumbnail` — Board visualization
 
 ### Firmware / Embedded
@@ -65,7 +67,7 @@
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - KiCad 9.0+ (for kicad-cli)
 - uv 0.8.0+ (package manager)
 - [Freerouting](https://github.com/freerouting/freerouting) JAR (optional, for auto-routing)
@@ -142,6 +144,21 @@ Create a `.env` file from the example: `cp .env.example .env`
 2. "Generate nRF52840 device tree"        → Zephyr .dts overlay
 3. "What I2C devices are connected?"      → Peripheral discovery
 ```
+
+### Mechanical and Simulation
+```
+1. "Set the board thickness in the stackup"  → a mid-mount connector needs the
+                                               right one, and STEP needs it to
+                                               export a board of the right height
+2. "Export the board as STEP"                → drop it into CAD, check the enclosure
+3. "Export the schematic as a SPICE netlist" → connectivity and values, mechanically
+```
+
+`export_spice_netlist` gives a deck that a simulator can read. Passive and
+linear sheets come out ready to run; anything with a diode or a transistor
+in it still needs its own model cards. One thing that deck is useful for is
+[netfault](https://github.com/quotentiroler/netfault), which measures a
+circuit and names the component whose value does not match the schematic.
 
 ## Upstream Compatibility
 
