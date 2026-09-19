@@ -5,15 +5,15 @@ Generates assembly-ready files in JLCPCB's required format:
 - BOM CSV: Comment, Designator, Footprint, LCSC Part #
 - CPL CSV: Designator, Mid X, Mid Y, Rotation, Layer
 """
+
 import csv
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
-
 
 # JLCPCB BOM columns
 JLCPCB_BOM_HEADER = ["Comment", "Designator", "Footprint", "LCSC Part #"]
@@ -29,7 +29,7 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
     def export_jlcpcb_bom(
         project_path: str,
         output_dir: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Export BOM and CPL files in JLCPCB assembly format.
 
         Generates two CSV files ready for JLCPCB SMT assembly ordering:
@@ -70,12 +70,14 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
             writer = csv.writer(f)
             writer.writerow(JLCPCB_BOM_HEADER)
             for group in bom_groups:
-                writer.writerow([
-                    group["comment"],
-                    group["designators"],
-                    group["footprint"],
-                    group["lcsc"],
-                ])
+                writer.writerow(
+                    [
+                        group["comment"],
+                        group["designators"],
+                        group["footprint"],
+                        group["lcsc"],
+                    ]
+                )
                 bom_rows += 1
 
         # Write CPL CSV
@@ -86,13 +88,15 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
             writer.writerow(JLCPCB_CPL_HEADER)
             for comp in components:
                 layer = "Top" if comp["layer"] == "F.Cu" else "Bottom"
-                writer.writerow([
-                    comp["reference"],
-                    f"{comp['x']:.4f}mm",
-                    f"{comp['y']:.4f}mm",
-                    f"{comp['rotation']:.1f}",
-                    layer,
-                ])
+                writer.writerow(
+                    [
+                        comp["reference"],
+                        f"{comp['x']:.4f}mm",
+                        f"{comp['y']:.4f}mm",
+                        f"{comp['rotation']:.1f}",
+                        layer,
+                    ]
+                )
                 cpl_rows += 1
 
         return {
@@ -106,13 +110,13 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
         }
 
 
-def _parse_pcb_components(pcb_path: str) -> List[Dict[str, Any]]:
+def _parse_pcb_components(pcb_path: str) -> list[dict[str, Any]]:
     """Parse footprint data from a .kicad_pcb file.
 
     Extracts reference, value, footprint, position, rotation, layer,
     and any LCSC property from each footprint block.
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     components = []
@@ -150,7 +154,7 @@ def _parse_pcb_components(pcb_path: str) -> List[Dict[str, Any]]:
         lcsc = _extract_property(block, "LCSC") or _extract_property(block, "LCSC Part #") or ""
 
         # Extract position: (at X Y rotation?)
-        at_match = re.search(r'\(at\s+([-\d.]+)\s+([-\d.]+)(?:\s+([-\d.]+))?\)', block)
+        at_match = re.search(r"\(at\s+([-\d.]+)\s+([-\d.]+)(?:\s+([-\d.]+))?\)", block)
         if not at_match:
             continue
 
@@ -166,16 +170,18 @@ def _parse_pcb_components(pcb_path: str) -> List[Dict[str, Any]]:
         if not ref or ref.startswith("#") or ref == "REF**":
             continue
 
-        components.append({
-            "reference": ref,
-            "value": value or "",
-            "footprint": footprint_name,
-            "lcsc": lcsc,
-            "x": x,
-            "y": y,
-            "rotation": rotation,
-            "layer": layer,
-        })
+        components.append(
+            {
+                "reference": ref,
+                "value": value or "",
+                "footprint": footprint_name,
+                "lcsc": lcsc,
+                "x": x,
+                "y": y,
+                "rotation": rotation,
+                "layer": layer,
+            }
+        )
 
     return components
 
@@ -203,9 +209,9 @@ def _extract_fp_field(block: str, field_name: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _group_for_bom(components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _group_for_bom(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Group components by value + footprint for BOM consolidation."""
-    groups: Dict[str, Dict[str, Any]] = {}
+    groups: dict[str, dict[str, Any]] = {}
 
     for comp in components:
         key = f"{comp['value']}||{comp['footprint']}||{comp['lcsc']}"
@@ -222,19 +228,18 @@ def _group_for_bom(components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for group in groups.values():
         # Sort references naturally (C1, C2, C10 not C1, C10, C2)
         group["refs"].sort(key=_natural_sort_key)
-        result.append({
-            "comment": group["comment"],
-            "designators": ", ".join(group["refs"]),
-            "footprint": group["footprint"],
-            "lcsc": group["lcsc"],
-        })
+        result.append(
+            {
+                "comment": group["comment"],
+                "designators": ", ".join(group["refs"]),
+                "footprint": group["footprint"],
+                "lcsc": group["lcsc"],
+            }
+        )
 
     return result
 
 
 def _natural_sort_key(s: str):
     """Sort key for natural ordering of component references."""
-    return [
-        int(part) if part.isdigit() else part.lower()
-        for part in re.split(r"(\d+)", s)
-    ]
+    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", s)]

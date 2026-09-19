@@ -7,12 +7,11 @@ by spawning KiCad's Python as a subprocess.
 """
 
 import json
+import logging
+import os
 import subprocess
 import sys
-import os
-from pathlib import Path
-from typing import Any, Dict, Optional
-import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ KICAD_PYTHON_PATHS = [
 ]
 
 
-def find_kicad_python() -> Optional[str]:
+def find_kicad_python() -> str | None:
     """Find KiCad's Python executable."""
     for path in KICAD_PYTHON_PATHS:
         if os.path.exists(path):
@@ -37,38 +36,38 @@ def find_kicad_python() -> Optional[str]:
 KICAD_PYTHON = find_kicad_python()
 
 
-def run_pcbnew_script(script: str, timeout: int = 60) -> Dict[str, Any]:
+def run_pcbnew_script(script: str, timeout: int = 60) -> dict[str, Any]:
     """
     Run a Python script using KiCad's Python interpreter.
-    
+
     The script should print a JSON result to stdout.
-    
+
     Args:
         script: Python code to execute (must print JSON to stdout)
         timeout: Timeout in seconds
-        
+
     Returns:
         Parsed JSON result from the script
     """
     if not KICAD_PYTHON:
         return {"error": "KiCad Python not found. Install KiCad or set KICAD_PYTHON_PATH."}
-    
+
     try:
         result = subprocess.run(
             [KICAD_PYTHON, "-c", script],
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=os.getcwd()
+            cwd=os.getcwd(),
         )
-        
+
         if result.returncode != 0:
             return {
                 "error": f"Script failed: {result.stderr}",
                 "stdout": result.stdout,
-                "returncode": result.returncode
+                "returncode": result.returncode,
             }
-        
+
         # Parse JSON output
         try:
             return json.loads(result.stdout)
@@ -76,19 +75,19 @@ def run_pcbnew_script(script: str, timeout: int = 60) -> Dict[str, Any]:
             return {
                 "error": "Failed to parse script output as JSON",
                 "stdout": result.stdout,
-                "stderr": result.stderr
+                "stderr": result.stderr,
             }
-            
+
     except subprocess.TimeoutExpired:
         return {"error": f"Script timed out after {timeout}s"}
     except Exception as e:
         return {"error": str(e)}
 
 
-def load_board_info(pcb_path: str) -> Dict[str, Any]:
+def load_board_info(pcb_path: str) -> dict[str, Any]:
     """
     Load board information using pcbnew.
-    
+
     Returns component positions, net info, and board bounds.
     """
     script = f'''
@@ -168,16 +167,16 @@ print(json.dumps(result))
     return run_pcbnew_script(script)
 
 
-def save_component_positions(pcb_path: str, positions: Dict[str, Dict]) -> Dict[str, Any]:
+def save_component_positions(pcb_path: str, positions: dict[str, dict]) -> dict[str, Any]:
     """
     Save component positions using pcbnew.
-    
+
     Args:
         pcb_path: Path to PCB file
         positions: Dict of ref -> {x, y, rotation}
     """
     positions_json = json.dumps(positions)
-    
+
     script = f'''
 import json
 import pcbnew
@@ -206,10 +205,10 @@ print(json.dumps({{"success": True, "moved": moved}}))
     return run_pcbnew_script(script)
 
 
-def analyze_placement(pcb_path: str) -> Dict[str, Any]:
+def analyze_placement(pcb_path: str) -> dict[str, Any]:
     """
     Analyze placement quality using pcbnew.
-    
+
     Returns wirelength, overlaps, density metrics.
     """
     script = f'''
@@ -309,7 +308,7 @@ print(json.dumps(result))
     return run_pcbnew_script(script)
 
 
-def propose_layouts(pcb_path: str, iterations: int = 3000) -> Dict[str, Any]:
+def propose_layouts(pcb_path: str, iterations: int = 3000) -> dict[str, Any]:
     """
     Generate placement proposals using pcbnew.
     """
@@ -456,13 +455,14 @@ print(json.dumps(result))
 if __name__ == "__main__":
     # Test
     import sys
+
     if len(sys.argv) > 1:
         pcb = sys.argv[1]
     else:
         pcb = r"c:\Users\MaximilianNussbaumer\Workspace\sleeptracker\hardware\SOM_Band\SOM_Band.kicad_pcb"
-    
+
     print("Testing pcbnew bridge...")
     print(f"KiCad Python: {KICAD_PYTHON}")
-    
+
     result = analyze_placement(pcb)
     print(json.dumps(result, indent=2))

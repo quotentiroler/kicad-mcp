@@ -5,10 +5,10 @@ Organizes all registered tools into categories so AI clients can discover
 tools on demand rather than loading all schemas upfront. This reduces
 context window usage by ~70% for large tool inventories.
 """
-from typing import Any, Dict, List
+
+from typing import Any
 
 from fastmcp import FastMCP
-
 
 # Tool category definitions with descriptions and member tool names
 TOOL_CATEGORIES = {
@@ -94,7 +94,7 @@ def register_tool_router(mcp: FastMCP) -> None:
     """Register tool router/discovery tools with the MCP server."""
 
     @mcp.tool()
-    def list_tool_categories() -> Dict[str, Any]:
+    def list_tool_categories() -> dict[str, Any]:
         """List all available tool categories with descriptions.
 
         Use this to discover what groups of tools are available before
@@ -116,7 +116,7 @@ def register_tool_router(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
-    def get_category_tools(category: str) -> Dict[str, Any]:
+    def get_category_tools(category: str) -> dict[str, Any]:
         """Get the list of tools in a specific category.
 
         Args:
@@ -139,7 +139,7 @@ def register_tool_router(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
-    def search_tools(query: str) -> Dict[str, Any]:
+    def search_tools(query: str) -> dict[str, Any]:
         """Search for tools by keyword across all categories.
 
         Args:
@@ -149,17 +149,19 @@ def register_tool_router(mcp: FastMCP) -> None:
             Dictionary with matching tools and their categories
         """
         q = query.lower().strip()
-        matches: List[Dict[str, str]] = []
+        matches: list[dict[str, str]] = []
 
         for cat_name, cat_info in TOOL_CATEGORIES.items():
             # Search in category description
             cat_match = q in cat_info["description"].lower()
             for tool_name in cat_info["tools"]:
                 if q in tool_name.lower() or cat_match:
-                    matches.append({
-                        "tool": tool_name,
-                        "category": cat_name,
-                    })
+                    matches.append(
+                        {
+                            "tool": tool_name,
+                            "category": cat_name,
+                        }
+                    )
 
         return {
             "query": query,
