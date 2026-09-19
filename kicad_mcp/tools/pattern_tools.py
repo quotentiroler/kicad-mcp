@@ -3,18 +3,19 @@ Circuit pattern recognition tools for KiCad schematics.
 """
 
 import os
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.utils.netlist_parser import extract_netlist, analyze_netlist
+from kicad_mcp.utils.netlist_parser import extract_netlist
 from kicad_mcp.utils.pattern_recognition import (
-    identify_power_supplies,
     identify_amplifiers,
-    identify_filters,
-    identify_oscillators,
     identify_digital_interfaces,
+    identify_filters,
     identify_microcontrollers,
+    identify_oscillators,
+    identify_power_supplies,
     identify_sensor_interfaces,
 )
 
@@ -27,7 +28,7 @@ def register_pattern_tools(mcp: FastMCP) -> None:
     """
 
     # Internal function - use analyze_project_circuit_patterns instead
-    def _identify_circuit_patterns_impl(schematic_path: str) -> Dict[str, Any]:
+    def _identify_circuit_patterns_impl(schematic_path: str) -> dict[str, Any]:
         """Internal: Identify common circuit patterns in a KiCad schematic."""
         if not os.path.exists(schematic_path):
             return {"success": False, "error": f"Schematic file not found: {schematic_path}"}
@@ -91,7 +92,7 @@ def register_pattern_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": str(e)}
 
     @mcp.tool()
-    def analyze_project_circuit_patterns(project_path: str) -> Dict[str, Any]:
+    def analyze_project_circuit_patterns(project_path: str) -> dict[str, Any]:
         """Identify circuit patterns in a KiCad project's schematic.
 
         Args:

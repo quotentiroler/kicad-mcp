@@ -3,10 +3,11 @@ Netlist resources for KiCad schematics.
 """
 
 import os
+
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.utils.netlist_parser import extract_netlist, analyze_netlist
+from kicad_mcp.utils.netlist_parser import analyze_netlist, extract_netlist
 
 
 def register_netlist_resources(mcp: FastMCP) -> None:

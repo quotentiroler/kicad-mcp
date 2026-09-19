@@ -9,12 +9,11 @@ Generates assembly-ready files in JLCPCB's required format:
 import csv
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
-
 
 # JLCPCB BOM columns
 JLCPCB_BOM_HEADER = ["Comment", "Designator", "Footprint", "LCSC Part #"]
@@ -30,7 +29,7 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
     def export_jlcpcb_bom(
         project_path: str,
         output_dir: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Export BOM and CPL files in JLCPCB assembly format.
 
         Generates two CSV files ready for JLCPCB SMT assembly ordering:
@@ -111,13 +110,13 @@ def register_jlcpcb_tools(mcp: FastMCP) -> None:
         }
 
 
-def _parse_pcb_components(pcb_path: str) -> List[Dict[str, Any]]:
+def _parse_pcb_components(pcb_path: str) -> list[dict[str, Any]]:
     """Parse footprint data from a .kicad_pcb file.
 
     Extracts reference, value, footprint, position, rotation, layer,
     and any LCSC property from each footprint block.
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     components = []
@@ -210,9 +209,9 @@ def _extract_fp_field(block: str, field_name: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _group_for_bom(components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _group_for_bom(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Group components by value + footprint for BOM consolidation."""
-    groups: Dict[str, Dict[str, Any]] = {}
+    groups: dict[str, dict[str, Any]] = {}
 
     for comp in components:
         key = f"{comp['value']}||{comp['footprint']}||{comp['lcsc']}"

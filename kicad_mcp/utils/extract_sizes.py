@@ -3,14 +3,13 @@
 Standalone script to extract actual component sizes from KiCad PCB.
 
 Run with KiCad's Python:
-  "C:\Program Files\KiCad\9.0\bin\python.exe" extract_sizes.py <pcb_file> <output_json>
+  "C:\\Program Files\\KiCad\\9.0\bin\\python.exe" extract_sizes.py <pcb_file> <output_json>
 
 Outputs a JSON file with component bounding box dimensions.
 """
 
 import json
 import sys
-import os
 
 
 def main():

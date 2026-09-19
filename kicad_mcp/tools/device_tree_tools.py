@@ -10,13 +10,12 @@ schematic net names and component values.
 
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.netlist_parser import extract_netlist
-
 
 # Device tree compatible strings for common components
 DEVICE_BINDINGS = {
@@ -99,7 +98,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
         project_path: str,
         target_soc: str = "nrf52840",
         output_path: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a Zephyr/Linux device tree overlay from a KiCad schematic.
 
         Analyzes the schematic to discover I2C, SPI, UART, and GPIO
@@ -170,7 +169,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
-    def extract_gpio_config(project_path: str) -> Dict[str, Any]:
+    def extract_gpio_config(project_path: str) -> dict[str, Any]:
         """Extract GPIO pin configuration from a KiCad schematic.
 
         Discovers GPIO assignments by analyzing net names connected to
@@ -198,7 +197,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
         return {"success": True, "gpio_pins": gpio_pins}
 
     @mcp.tool()
-    def extract_i2c_devices(project_path: str) -> Dict[str, Any]:
+    def extract_i2c_devices(project_path: str) -> dict[str, Any]:
         """Extract I2C devices discovered in a KiCad schematic.
 
         Args:
@@ -223,7 +222,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
         return {"success": True, "i2c_devices": devices}
 
     @mcp.tool()
-    def extract_spi_devices(project_path: str) -> Dict[str, Any]:
+    def extract_spi_devices(project_path: str) -> dict[str, Any]:
         """Extract SPI devices discovered in a KiCad schematic.
 
         Args:
@@ -253,7 +252,7 @@ def register_device_tree_tools(mcp: FastMCP) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _find_binding(value: str) -> Optional[str]:
+def _find_binding(value: str) -> str | None:
     """Find device tree compatible string for a component value."""
     if not value:
         return None
@@ -264,7 +263,7 @@ def _find_binding(value: str) -> Optional[str]:
     return None
 
 
-def _find_i2c_address(value: str) -> Optional[int]:
+def _find_i2c_address(value: str) -> int | None:
     """Look up default I2C address for a known component."""
     if not value:
         return None
@@ -275,7 +274,7 @@ def _find_i2c_address(value: str) -> Optional[int]:
     return None
 
 
-def _infer_bus_type(net_name: str) -> Optional[str]:
+def _infer_bus_type(net_name: str) -> str | None:
     """Infer peripheral bus type from net name."""
     if not net_name:
         return None
@@ -300,7 +299,7 @@ def _infer_bus_number(net_name: str) -> int:
     return 0
 
 
-def _discover_i2c_devices(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
+def _discover_i2c_devices(components: list[dict], nets: dict) -> list[dict[str, Any]]:
     """Discover I2C devices from schematic netlist data."""
     devices = []
     seen_refs = set()
@@ -349,7 +348,7 @@ def _discover_i2c_devices(components: List[Dict], nets: Dict) -> List[Dict[str, 
     return devices
 
 
-def _discover_spi_devices(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
+def _discover_spi_devices(components: list[dict], nets: dict) -> list[dict[str, Any]]:
     """Discover SPI devices from schematic netlist data."""
     devices = []
     seen_refs = set()
@@ -396,7 +395,7 @@ def _discover_spi_devices(components: List[Dict], nets: Dict) -> List[Dict[str, 
     return devices
 
 
-def _discover_uart_peripherals(nets: Dict) -> List[Dict[str, Any]]:
+def _discover_uart_peripherals(nets: dict) -> list[dict[str, Any]]:
     """Discover UART peripherals from net names."""
     uart_buses = set()
     for net_name in nets:
@@ -406,7 +405,7 @@ def _discover_uart_peripherals(nets: Dict) -> List[Dict[str, Any]]:
     return [{"bus": n} for n in sorted(uart_buses)]
 
 
-def _discover_gpio_pins(components: List[Dict], nets: Dict) -> List[Dict[str, Any]]:
+def _discover_gpio_pins(components: list[dict], nets: dict) -> list[dict[str, Any]]:
     """Discover GPIO pin assignments from net names."""
     gpio_pins = []
     gpio_pattern = re.compile(r"P(\d+)\.(\d+)|GPIO(\d+)", re.IGNORECASE)
@@ -442,10 +441,10 @@ def _discover_gpio_pins(components: List[Dict], nets: Dict) -> List[Dict[str, An
 def _render_device_tree(
     soc: str,
     board_name: str,
-    i2c_devices: List[Dict],
-    spi_devices: List[Dict],
-    uart_devices: List[Dict],
-    gpio_pins: List[Dict],
+    i2c_devices: list[dict],
+    spi_devices: list[dict],
+    uart_devices: list[dict],
+    gpio_pins: list[dict],
 ) -> str:
     """Render device tree overlay source."""
     lines = [
@@ -458,24 +457,24 @@ def _render_device_tree(
     if soc == "nrf52840":
         lines.append("/ {")
         lines.append(f'\tmodel = "{board_name}";')
-        lines.append(f'\tcompatible = "nordic,nrf52840-dk-nrf52840";')
+        lines.append('\tcompatible = "nordic,nrf52840-dk-nrf52840";')
         lines.append("};")
         lines.append("")
     elif soc == "stm32":
         lines.append("/ {")
         lines.append(f'\tmodel = "{board_name}";')
-        lines.append(f'\tcompatible = "st,stm32";')
+        lines.append('\tcompatible = "st,stm32";')
         lines.append("};")
         lines.append("")
     elif soc == "esp32":
         lines.append("/ {")
         lines.append(f'\tmodel = "{board_name}";')
-        lines.append(f'\tcompatible = "espressif,esp32";')
+        lines.append('\tcompatible = "espressif,esp32";')
         lines.append("};")
         lines.append("")
 
     # I2C buses
-    i2c_by_bus: Dict[int, List[Dict]] = {}
+    i2c_by_bus: dict[int, list[dict]] = {}
     for dev in i2c_devices:
         i2c_by_bus.setdefault(dev["bus"], []).append(dev)
 
@@ -501,7 +500,7 @@ def _render_device_tree(
         lines.append("")
 
     # SPI buses
-    spi_by_bus: Dict[int, List[Dict]] = {}
+    spi_by_bus: dict[int, list[dict]] = {}
     for dev in spi_devices:
         spi_by_bus.setdefault(dev["bus"], []).append(dev)
 

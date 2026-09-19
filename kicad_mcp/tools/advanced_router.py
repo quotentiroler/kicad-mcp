@@ -10,13 +10,13 @@ This module provides a high-quality auto-routing solution for KiCad PCBs with:
 - Support for routing around existing traces and vias
 """
 
-import math
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
 import heapq
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict
-from enum import Enum
+import math
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class Point2D:
             return False
         return round(self.x, 4) == round(other.x, 4) and round(self.y, 4) == round(other.y, 4)
 
-    def as_tuple(self) -> Tuple[float, float]:
+    def as_tuple(self) -> tuple[float, float]:
         return (self.x, self.y)
 
 
@@ -249,10 +249,10 @@ class Obstacle:
 class RoutingContext:
     """Context for routing containing all necessary information."""
 
-    obstacles: Dict[str, List[Obstacle]]  # layer -> obstacles
-    board_bounds: Tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
-    net_pads: Dict[str, List[Point2D]]  # net -> pad positions
-    net_id_map: Dict[str, int]  # net_name -> net_id
+    obstacles: dict[str, list[Obstacle]]  # layer -> obstacles
+    board_bounds: tuple[float, float, float, float]  # min_x, min_y, max_x, max_y
+    net_pads: dict[str, list[Point2D]]  # net -> pad positions
+    net_id_map: dict[str, int]  # net_name -> net_id
     clearance: float = DEFAULT_CLEARANCE
     trace_width: float = DEFAULT_TRACE_WIDTH
     via_size: float = DEFAULT_VIA_SIZE
@@ -286,7 +286,7 @@ def segment_intersects_rectangle(seg: Segment, rect: Rectangle) -> bool:
 
 
 def check_point_clearance(
-    p: Point2D, layer: str, ctx: RoutingContext, exclude_net: Optional[int] = None
+    p: Point2D, layer: str, ctx: RoutingContext, exclude_net: int | None = None
 ) -> float:
     """Check clearance from a point to all obstacles on a layer.
 
@@ -317,7 +317,7 @@ def check_segment_clearance(
     layer: str,
     trace_width: float,
     ctx: RoutingContext,
-    exclude_net: Optional[int] = None,
+    exclude_net: int | None = None,
 ) -> float:
     """Check clearance from a trace segment to all obstacles.
 
@@ -347,7 +347,7 @@ def check_segment_clearance(
     return min_clearance
 
 
-def is_valid_via_position(pos: Point2D, ctx: RoutingContext, net_id: Optional[int] = None) -> bool:
+def is_valid_via_position(pos: Point2D, ctx: RoutingContext, net_id: int | None = None) -> bool:
     """Check if a via can be placed at this position.
 
     Vias span all layers, so we must check clearance on ALL layers.
@@ -377,7 +377,7 @@ def is_valid_via_position(pos: Point2D, ctx: RoutingContext, net_id: Optional[in
 
 
 def is_point_in_bounds(
-    p: Point2D, bounds: Tuple[float, float, float, float], margin: float = 0.2
+    p: Point2D, bounds: tuple[float, float, float, float], margin: float = 0.2
 ) -> bool:
     """Check if point is within board bounds with margin."""
     min_x, min_y, max_x, max_y = bounds
@@ -414,9 +414,9 @@ def get_neighbors_45deg(
     ctx: RoutingContext,
     goal: RouteNode,
     net_id: int,
-    start_pos: Optional[Point2D] = None,
-    end_pos: Optional[Point2D] = None,
-) -> List[Tuple[RouteNode, float, Segment]]:
+    start_pos: Point2D | None = None,
+    end_pos: Point2D | None = None,
+) -> list[tuple[RouteNode, float, Segment]]:
     """Get valid neighboring nodes with 45-degree routing support.
 
     Args:
@@ -494,7 +494,7 @@ def find_route(
     ctx: RoutingContext,
     net_id: int,
     max_iterations: int = 100000,
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Find a route between two points using weighted A* with segment-based clearance.
 
     Uses adaptive techniques for efficient routing:
@@ -532,10 +532,10 @@ def find_route(
     counter = 0
     open_set = [(heuristic(start, goal), counter, start)]
 
-    came_from: Dict[RouteNode, Tuple[RouteNode, Optional[Segment]]] = {}
-    g_score: Dict[RouteNode, float] = {start: 0}
+    came_from: dict[RouteNode, tuple[RouteNode, Segment | None]] = {}
+    g_score: dict[RouteNode, float] = {start: 0}
 
-    closed_set: Set[RouteNode] = set()
+    closed_set: set[RouteNode] = set()
     iterations = 0
 
     # Progress tracking
@@ -624,7 +624,7 @@ def find_route(
 
 def try_direct_route(
     start: Point2D, end: Point2D, layer: str, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Try a direct straight line route - fastest possible."""
     seg = Segment(start, end)
     if check_segment_clearance(seg, layer, ctx.trace_width, ctx, net_id) >= 0:
@@ -634,7 +634,7 @@ def try_direct_route(
 
 def try_l_route(
     start: Point2D, end: Point2D, layer: str, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Try L-shaped route (horizontal then vertical, or vertical then horizontal)."""
     # Option 1: Go horizontal first, then vertical
     mid1 = Point2D(end.x, start.y)
@@ -671,7 +671,7 @@ def try_l_route(
 
 def try_z_route(
     start: Point2D, end: Point2D, layer: str, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Try Z-shaped route (3 segments with 45-degree middle)."""
     dx = end.x - start.x
     dy = end.y - start.y
@@ -706,7 +706,7 @@ def try_z_route(
 
 def fast_route(
     start: Point2D, end: Point2D, layer: str, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Try fast routing methods before falling back to A*.
 
     Order of attempts:
@@ -736,7 +736,7 @@ def fast_route(
 
 def fast_route_with_layer_change(
     start: Point2D, end: Point2D, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Try routing with optional layer change if single-layer fails."""
     # Try top layer first
     route = fast_route(start, end, "F.Cu", ctx, net_id)
@@ -786,8 +786,8 @@ class ObstacleGrid:
         ctx: RoutingContext,
         layer: str,
         net_id: int,
-        start_pos: Optional[Point2D] = None,
-        end_pos: Optional[Point2D] = None,
+        start_pos: Point2D | None = None,
+        end_pos: Point2D | None = None,
     ):
         self.ctx = ctx
         self.layer = layer
@@ -868,7 +868,7 @@ class ObstacleGrid:
                     if dist < clearance_needed:
                         self.blocked.add((col, row))
 
-    def pos_to_cell(self, pos: Point2D) -> Tuple[int, int]:
+    def pos_to_cell(self, pos: Point2D) -> tuple[int, int]:
         """Convert position to grid cell."""
         col = int((pos.x - self.min_x) / self.grid_step + 0.5)
         row = int((pos.y - self.min_y) / self.grid_step + 0.5)
@@ -909,7 +909,7 @@ def jps_find_route(
     ctx: RoutingContext,
     net_id: int,
     max_iterations: int = 50000,
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Jump Point Search - 10x faster than A* on uniform grids.
 
     JPS works by "jumping" along straight lines until hitting obstacles
@@ -945,7 +945,7 @@ def jps_find_route(
         dc, dr = abs(c2 - c1), abs(r2 - r1)
         return max(dc, dr) + (1.414 - 1) * min(dc, dr)
 
-    def jump(col: int, row: int, dc: int, dr: int) -> Optional[Tuple[int, int]]:
+    def jump(col: int, row: int, dc: int, dr: int) -> tuple[int, int] | None:
         """Jump in direction until obstacle, jump point, or goal."""
         nc, nr = col + dc, row + dr
 
@@ -985,8 +985,8 @@ def jps_find_route(
         return jump(nc, nr, dc, dr)
 
     def get_successors(
-        col: int, row: int, parent: Optional[Tuple[int, int]]
-    ) -> List[Tuple[int, int]]:
+        col: int, row: int, parent: tuple[int, int] | None
+    ) -> list[tuple[int, int]]:
         """Get jump point successors from a node."""
         successors = []
 
@@ -1049,7 +1049,7 @@ def jps_find_route(
     # A* with JPS successors
     counter = 0
     open_set = [(heuristic(*start_cell, *end_cell), counter, start_cell, None)]
-    came_from: Dict[Tuple[int, int], Optional[Tuple[int, int]]] = {start_cell: None}
+    came_from: dict[tuple[int, int], tuple[int, int] | None] = {start_cell: None}
     g_score = {start_cell: 0.0}
     iterations = 0
 
@@ -1101,7 +1101,7 @@ def jps_find_route(
 
 def fast_route_jps(
     start: Point2D, end: Point2D, layer: str, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """Fast routing using JPS with fallbacks.
 
     Order:
@@ -1149,7 +1149,7 @@ def fast_route_jps(
 
 def fast_route_jps_with_layer_change(
     start: Point2D, end: Point2D, ctx: RoutingContext, net_id: int
-) -> Optional[List[Tuple[RouteNode, Optional[Segment]]]]:
+) -> list[tuple[RouteNode, Segment | None]] | None:
     """JPS-based routing with optional layer change."""
     # Try top layer first
     route = fast_route_jps(start, end, "F.Cu", ctx, net_id)
@@ -1208,8 +1208,8 @@ def fast_route_jps_with_layer_change(
 
 
 def simplify_path(
-    path: List[Tuple[RouteNode, Optional[Segment]]],
-) -> List[Tuple[RouteNode, Optional[Segment]]]:
+    path: list[tuple[RouteNode, Segment | None]],
+) -> list[tuple[RouteNode, Segment | None]]:
     """Remove unnecessary intermediate points from a path.
 
     Merges colinear segments to reduce the number of segments.
@@ -1267,7 +1267,7 @@ def simplify_path(
 
 def build_routing_context(
     pcb_data: Any,
-    pads_data: List[Any],
+    pads_data: list[Any],
     clearance: float = DEFAULT_CLEARANCE,
     trace_width: float = DEFAULT_TRACE_WIDTH,
     grid_step: float = DEFAULT_GRID_STEP,
@@ -1284,9 +1284,9 @@ def build_routing_context(
     Returns:
         RoutingContext for routing operations
     """
-    obstacles: Dict[str, List[Obstacle]] = defaultdict(list)
-    net_pads: Dict[str, List[Point2D]] = defaultdict(list)
-    net_id_map: Dict[str, int] = {}
+    obstacles: dict[str, list[Obstacle]] = defaultdict(list)
+    net_pads: dict[str, list[Point2D]] = defaultdict(list)
+    net_id_map: dict[str, int] = {}
 
     # Build net ID map
     for net_id, net_name in pcb_data.nets.items():
@@ -1369,7 +1369,7 @@ def build_routing_context(
     )
 
 
-def update_context_with_segments(ctx: RoutingContext, segments: List[Dict[str, Any]]) -> None:
+def update_context_with_segments(ctx: RoutingContext, segments: list[dict[str, Any]]) -> None:
     """Incrementally update routing context with new trace/via segments.
 
     This is MUCH faster than rebuilding the entire context after each net.
@@ -1419,7 +1419,7 @@ def update_context_with_segments(ctx: RoutingContext, segments: List[Dict[str, A
 
 def route_single_net(
     ctx: RoutingContext, net_name: str, trace_width: float, use_jps: bool = True
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Route all connections for a single net.
 
     Uses minimum spanning tree approach to connect all pads efficiently.
@@ -1559,14 +1559,14 @@ def get_net_priority(net_name: str) -> int:
     return 5
 
 
-def categorize_nets(net_id_map: Dict[str, int]) -> Dict[str, List[str]]:
+def categorize_nets(net_id_map: dict[str, int]) -> dict[str, list[str]]:
     """Categorize nets by type for routing order.
 
     Returns dict with keys: 'power', 'clock', 'antenna', 'bus', 'signal', 'skip'
     """
-    categories: Dict[str, List[str]] = defaultdict(list)
+    categories: dict[str, list[str]] = defaultdict(list)
 
-    for net_name in net_id_map.keys():
+    for net_name in net_id_map:
         if not net_name or net_name.startswith("unconnected"):
             categories["skip"].append(net_name)
         elif net_name.upper() == "GND":
@@ -1591,10 +1591,10 @@ def categorize_nets(net_id_map: Dict[str, int]) -> Dict[str, List[str]]:
 
 
 def segments_to_sexpr(
-    segments: List[Dict[str, Any]],
+    segments: list[dict[str, Any]],
     via_size: float = DEFAULT_VIA_SIZE,
     via_drill: float = DEFAULT_VIA_DRILL,
-) -> List[str]:
+) -> list[str]:
     """Convert route segments to KiCad S-expressions.
 
     Args:
@@ -1670,7 +1670,7 @@ class BoardAnalysis:
     routing_difficulty: str  # "easy", "moderate", "hard", "very_hard"
 
 
-def analyze_board_complexity(pcb_data: Any, pads_data: List[Any]) -> BoardAnalysis:
+def analyze_board_complexity(pcb_data: Any, pads_data: list[Any]) -> BoardAnalysis:
     """Analyze board complexity and recommend routing parameters.
 
     This function examines the PCB layout and determines:
@@ -1711,8 +1711,8 @@ def analyze_board_complexity(pcb_data: Any, pads_data: List[Any]) -> BoardAnalys
     pad_density = total_pads / board_area if board_area > 0 else 0
 
     # Analyze nets
-    net_pad_counts: Dict[str, int] = defaultdict(int)
-    net_positions: Dict[str, List[Tuple[float, float]]] = defaultdict(list)
+    net_pad_counts: dict[str, int] = defaultdict(int)
+    net_positions: dict[str, list[tuple[float, float]]] = defaultdict(list)
 
     for pad in pads_data:
         net_name = pad.net if hasattr(pad, "net") else pad.get("net", "")
@@ -1756,9 +1756,7 @@ def analyze_board_complexity(pcb_data: Any, pads_data: List[Any]) -> BoardAnalys
     # - 2 layers: congestion < 0.4 and pad_density < 0.1
     # - 4 layers: congestion < 0.7 or high-speed signals
     # - 6+ layers: congestion > 0.7 or very dense
-    if congestion_factor < 0.3 and pad_density < 0.05:
-        layer_recommendation = 2
-    elif congestion_factor < 0.5 and pad_density < 0.1:
+    if congestion_factor < 0.3 and pad_density < 0.05 or congestion_factor < 0.5 and pad_density < 0.1:
         layer_recommendation = 2
     elif congestion_factor < 0.7:
         layer_recommendation = 4
@@ -1818,7 +1816,7 @@ def analyze_board_complexity(pcb_data: Any, pads_data: List[Any]) -> BoardAnalys
     )
 
 
-def get_adaptive_routing_params(analysis: BoardAnalysis) -> Dict[str, Any]:
+def get_adaptive_routing_params(analysis: BoardAnalysis) -> dict[str, Any]:
     """Get routing parameters adapted to board complexity.
 
     Args:

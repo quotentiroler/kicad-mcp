@@ -15,14 +15,13 @@ Freerouting is a mature, advanced PCB auto-router with:
 GitHub: https://github.com/freerouting/freerouting
 """
 
+import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
-import tempfile
-import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from kicad_mcp.utils.file_utils import get_project_files
 
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-def find_freerouting_jar() -> Optional[Path]:
+def find_freerouting_jar() -> Path | None:
     """Find the Freerouting JAR file.
 
     Searches in common locations:
@@ -172,7 +171,7 @@ def find_freerouting_jar() -> Optional[Path]:
     return None
 
 
-def find_java() -> Optional[str]:
+def find_java() -> str | None:
     """Find Java executable.
 
     Returns:
@@ -195,7 +194,7 @@ def find_java() -> Optional[str]:
     return None
 
 
-def get_java_version(java_path: str) -> Optional[str]:
+def get_java_version(java_path: str) -> str | None:
     """Get Java version string.
 
     Returns:
@@ -218,7 +217,7 @@ def get_java_version(java_path: str) -> Optional[str]:
 # ============================================================================
 
 
-def find_kicad_python() -> Optional[str]:
+def find_kicad_python() -> str | None:
     """Find KiCad's bundled Python executable.
 
     Returns:
@@ -355,10 +354,10 @@ def run_freerouting(
     ses_path: str,
     jar_path: str,
     java_path: str,
-    skip_nets: Optional[List[str]] = None,
+    skip_nets: list[str] | None = None,
     timeout: int = 600,  # 10 minutes default
-    max_passes: Optional[int] = None,
-) -> Dict[str, Any]:
+    max_passes: int | None = None,
+) -> dict[str, Any]:
     """Run Freerouting in headless CLI mode.
 
     Args:
@@ -423,10 +422,10 @@ def register_freerouting_tools(mcp):
     @mcp.tool()
     async def freeroute_pcb(
         project_path: str,
-        skip_nets: Optional[List[str]] = None,
+        skip_nets: list[str] | None = None,
         max_passes: int = 100,
         timeout: int = 600,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Auto-route PCB using Freerouting professional auto-router.
 
         Freerouting is a mature, production-quality PCB auto-router that provides:
@@ -539,7 +538,7 @@ def register_freerouting_tools(mcp):
                     pass
 
     @mcp.tool()
-    async def check_freerouting_installation() -> Dict[str, Any]:
+    async def check_freerouting_installation() -> dict[str, Any]:
         """Check if Freerouting and Java are properly installed.
 
         Verifies:
@@ -605,7 +604,7 @@ def register_freerouting_tools(mcp):
         return result
 
     @mcp.tool()
-    async def export_dsn_file(project_path: str) -> Dict[str, Any]:
+    async def export_dsn_file(project_path: str) -> dict[str, Any]:
         """Export PCB to Specctra DSN format for external routing.
 
         Creates a .dsn file that can be opened in Freerouting GUI or
@@ -629,7 +628,7 @@ def register_freerouting_tools(mcp):
         if export_dsn(pcb_path, dsn_path):
             return {
                 "success": True,
-                "message": f"Exported DSN file for external routing",
+                "message": "Exported DSN file for external routing",
                 "dsn_path": dsn_path,
                 "help": "Open this file in Freerouting GUI, route, then save as .ses and use import_ses_file",
             }
@@ -637,7 +636,7 @@ def register_freerouting_tools(mcp):
             return {"error": "Failed to export DSN file"}
 
     @mcp.tool()
-    async def import_ses_file(project_path: str, ses_path: str) -> Dict[str, Any]:
+    async def import_ses_file(project_path: str, ses_path: str) -> dict[str, Any]:
         """Import a Specctra SES session file into the PCB.
 
         Imports routing results from Freerouting or other Specctra-compatible

@@ -3,9 +3,8 @@ Utility functions for detecting and selecting available KiCad API approaches.
 """
 
 import os
-import subprocess
 import shutil
-from typing import Tuple, Optional, Literal
+import subprocess
 
 from kicad_mcp.config import system
 

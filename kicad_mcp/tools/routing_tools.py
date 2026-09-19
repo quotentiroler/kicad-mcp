@@ -5,25 +5,21 @@ Provides intelligent auto-routing, copper pours, and net-aware routing
 capabilities through the MCP interface.
 """
 
+from collections import defaultdict
+from dataclasses import dataclass
+import logging
+import math
 import os
 import re
-import math
-import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass
-from collections import defaultdict
+from typing import Any
 
+from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.pcb_parser import (
-    parse_pcb_file,
     PCBData,
-    Track,
-    Via,
-    create_track_sexpr,
     create_via_sexpr,
     generate_uuid,
+    parse_pcb_file,
 )
-from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.utils.netlist_parser import extract_netlist
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +29,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-def insert_tracks_into_pcb(pcb_path: str, tracks_sexpr: List[str]) -> bool:
+def insert_tracks_into_pcb(pcb_path: str, tracks_sexpr: list[str]) -> bool:
     """Safely insert track segments into PCB file before final closing paren.
 
     Args:
@@ -43,7 +39,7 @@ def insert_tracks_into_pcb(pcb_path: str, tracks_sexpr: List[str]) -> bool:
     Returns:
         True if successful
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     # Find the last closing paren (end of kicad_pcb)
@@ -73,8 +69,8 @@ class Pad:
 
     reference: str  # Component reference (e.g., "U1")
     pad_number: str  # Pad number or name
-    position: Tuple[float, float]
-    size: Tuple[float, float]  # Width, height
+    position: tuple[float, float]
+    size: tuple[float, float]  # Width, height
     net: str
     layer: str = "F.Cu"
     shape: str = "rect"  # rect, circle, oval
@@ -85,7 +81,7 @@ class Pad:
 # ============================================================================
 
 
-def extract_pads_from_pcb(pcb: PCBData) -> List[Pad]:
+def extract_pads_from_pcb(pcb: PCBData) -> list[Pad]:
     """Extract all pad positions from PCB footprints.
 
     Args:
@@ -177,7 +173,7 @@ def extract_pads_from_pcb(pcb: PCBData) -> List[Pad]:
     return pads
 
 
-def get_net_pads(pads: List[Pad], net_name: str) -> List[Pad]:
+def get_net_pads(pads: list[Pad], net_name: str) -> list[Pad]:
     """Get all pads belonging to a specific net.
 
     Args:
@@ -199,7 +195,7 @@ def create_zone_sexpr(
     net_name: str,
     net_id: int,
     layer: str,
-    outline: List[Tuple[float, float]],
+    outline: list[tuple[float, float]],
     priority: int = 0,
     min_thickness: float = 0.25,
     thermal_gap: float = 0.5,
@@ -258,7 +254,7 @@ def add_zone_to_pcb(pcb_path: str, zone_sexpr: str) -> bool:
     Returns:
         True if successful
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     # Insert before the final closing parenthesis
@@ -285,16 +281,16 @@ def register_routing_tools(mcp):
     # Import advanced router
     try:
         from kicad_mcp.tools.advanced_router import (
+            DEFAULT_CLEARANCE,
+            DEFAULT_GRID_STEP,
+            DEFAULT_TRACE_WIDTH,
+            Point2D,
             build_routing_context,
-            route_single_net,
-            segments_to_sexpr,
             categorize_nets,
             get_net_priority,
-            Point2D,
+            route_single_net,
+            segments_to_sexpr,
             update_context_with_segments,
-            DEFAULT_CLEARANCE,
-            DEFAULT_TRACE_WIDTH,
-            DEFAULT_GRID_STEP,
         )
 
         ADVANCED_ROUTER_AVAILABLE = True
@@ -310,7 +306,7 @@ def register_routing_tools(mcp):
         trace_width: float = 0.25,
         grid_step: float = 0.5,
         min_clearance: float = 0.15,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Automatically route a single net using advanced pathfinding.
 
         Finds all pads belonging to the specified net and routes traces
@@ -387,7 +383,7 @@ def register_routing_tools(mcp):
     @mcp.tool()
     def add_ground_pour(
         project_path: str, layer: str = "B.Cu", net_name: str = "GND", margin: float = 0.5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a ground pour (copper fill) to a layer.
 
         Creates a copper zone covering the entire board on the specified
@@ -464,9 +460,9 @@ def register_routing_tools(mcp):
         project_path: str,
         trace_width: float = 0.25,
         power_trace_width: float = 0.4,
-        skip_nets: Optional[List[str]] = None,
+        skip_nets: list[str] | None = None,
         min_clearance: float = 0.15,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Route all nets in the PCB automatically.
 
         Routes each net in priority order: power nets first, then signals.
@@ -590,7 +586,7 @@ def register_routing_tools(mcp):
     # smart_route_all removed - was buggy and hanging
 
     @mcp.tool()
-    def analyze_board_for_routing(project_path: str) -> Dict[str, Any]:
+    def analyze_board_for_routing(project_path: str) -> dict[str, Any]:
         """Analyze board complexity and get routing recommendations.
 
         This tool examines the PCB layout and provides:
@@ -613,8 +609,8 @@ def register_routing_tools(mcp):
         # Import analysis functions
         from kicad_mcp.tools.advanced_router import (
             analyze_board_complexity,
-            get_adaptive_routing_params,
             format_analysis_report,
+            get_adaptive_routing_params,
         )
 
         files = get_project_files(project_path)
@@ -689,7 +685,7 @@ def register_routing_tools(mcp):
             )
 
     @mcp.tool()
-    def get_unrouted_nets(project_path: str) -> Dict[str, Any]:
+    def get_unrouted_nets(project_path: str) -> dict[str, Any]:
         """Get a list of nets that need to be routed.
 
         Analyzes the PCB to find nets with multiple pads that don't
@@ -765,7 +761,7 @@ def register_routing_tools(mcp):
         spacing: float = 5.0,
         via_size: float = 0.8,
         via_drill: float = 0.4,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add via stitching between top and bottom copper pours.
 
         Creates a grid of vias connecting ground planes on both layers
@@ -862,7 +858,7 @@ def register_routing_tools(mcp):
 
             # Add vias to PCB
             if vias_added:
-                with open(pcb_path, "r", encoding="utf-8") as f:
+                with open(pcb_path, encoding="utf-8") as f:
                     content = f.read()
 
                 insert_pos = content.rfind(")")
@@ -909,8 +905,8 @@ def register_routing_tools(mcp):
 
 
 def find_layer_transition_points(
-    pcb: PCBData, pads: List[Pad], via_size: float = 0.6
-) -> Dict[str, List[Tuple[float, float]]]:
+    pcb: PCBData, pads: list[Pad], via_size: float = 0.6
+) -> dict[str, list[tuple[float, float]]]:
     """Find points where tracks on different layers for the same net need vias.
 
     Args:
@@ -929,7 +925,7 @@ def find_layer_transition_points(
 
     # Store ALL pads as exclusion zones (not per-layer - vias span all layers)
     # Format: (center_x, center_y, half_width + exclusion, half_height + exclusion, net)
-    all_pad_zones: List[Tuple[float, float, float, float, str]] = []
+    all_pad_zones: list[tuple[float, float, float, float, str]] = []
 
     for pad in pads:
         x, y = pad.position
@@ -952,7 +948,7 @@ def find_layer_transition_points(
         return False
 
     # Group track endpoints by net
-    net_endpoints: Dict[int, Dict[str, List[Tuple[float, float]]]] = defaultdict(
+    net_endpoints: dict[int, dict[str, list[tuple[float, float]]]] = defaultdict(
         lambda: defaultdict(list)
     )
 
@@ -965,7 +961,7 @@ def find_layer_transition_points(
     for via in pcb.vias:
         existing_vias.add((round(via.position[0], 2), round(via.position[1], 2)))
 
-    transition_points: Dict[str, List[Tuple[float, float]]] = {}
+    transition_points: dict[str, list[tuple[float, float]]] = {}
 
     for net_id, layer_points in net_endpoints.items():
         net_name = pcb.nets.get(net_id, f"net_{net_id}")
@@ -1001,7 +997,7 @@ def find_layer_transition_points(
 
 def add_layer_transition_vias_to_pcb(
     pcb_path: str, via_size: float = 0.6, via_drill: float = 0.3
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Add vias at layer transition points.
 
     Args:
@@ -1043,7 +1039,7 @@ def add_layer_transition_vias_to_pcb(
             total_vias += 1
 
     if vias_sexpr:
-        with open(pcb_path, "r", encoding="utf-8") as f:
+        with open(pcb_path, encoding="utf-8") as f:
             content = f.read()
 
         insert_pos = content.rfind(")")
@@ -1067,7 +1063,7 @@ def add_layer_transition_vias_to_pcb(
 # ============================================================================
 
 
-def find_dangling_tracks(pcb: PCBData, pads: List[Pad]) -> List[str]:
+def find_dangling_tracks(pcb: PCBData, pads: list[Pad]) -> list[str]:
     """Find track UUIDs that have endpoints not connected to anything.
 
     Args:
@@ -1078,7 +1074,7 @@ def find_dangling_tracks(pcb: PCBData, pads: List[Pad]) -> List[str]:
         List of track UUIDs that are dangling
     """
     # Build set of valid connection points (pads, via positions, other track endpoints)
-    valid_points: Dict[str, Set[Tuple[float, float]]] = defaultdict(set)
+    valid_points: dict[str, set[tuple[float, float]]] = defaultdict(set)
 
     # Add pad positions
     for pad in pads:
@@ -1091,7 +1087,7 @@ def find_dangling_tracks(pcb: PCBData, pads: List[Pad]) -> List[str]:
         valid_points["B.Cu"].add(pos)
 
     # Build connectivity map from tracks
-    track_endpoints: Dict[str, List[Tuple[Tuple[float, float], str]]] = defaultdict(
+    track_endpoints: dict[str, list[tuple[tuple[float, float], str]]] = defaultdict(
         list
     )  # layer -> [(pos, uuid)]
 
@@ -1134,7 +1130,7 @@ def find_dangling_tracks(pcb: PCBData, pads: List[Pad]) -> List[str]:
     return dangling_uuids
 
 
-def cleanup_dangling_tracks(pcb_path: str) -> Dict[str, Any]:
+def cleanup_dangling_tracks(pcb_path: str) -> dict[str, Any]:
     """Remove dangling track segments from PCB.
 
     Args:
@@ -1152,7 +1148,7 @@ def cleanup_dangling_tracks(pcb_path: str) -> Dict[str, Any]:
         return {"success": True, "message": "No dangling tracks found", "tracks_removed": 0}
 
     # Remove dangling tracks from file using balanced S-expression removal
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     removed = 0
@@ -1186,7 +1182,7 @@ def cleanup_dangling_tracks(pcb_path: str) -> Dict[str, Any]:
         logger.error(f"File would become unbalanced after cleanup: {opens} opens, {closes} closes")
         return {
             "success": False,
-            "error": f"Operation would corrupt file (unbalanced parentheses)",
+            "error": "Operation would corrupt file (unbalanced parentheses)",
             "tracks_found": len(dangling),
         }
 
@@ -1273,7 +1269,7 @@ def _remove_sexps_by_type(content: str, sexp_type: str) -> tuple[str, int]:
     return "".join(result), removed
 
 
-def clear_all_tracks_from_pcb(pcb_path: str, keep_zones: bool = True) -> Dict[str, Any]:
+def clear_all_tracks_from_pcb(pcb_path: str, keep_zones: bool = True) -> dict[str, Any]:
     """Clear all tracks and vias from PCB for fresh routing.
 
     Args:
@@ -1283,7 +1279,7 @@ def clear_all_tracks_from_pcb(pcb_path: str, keep_zones: bool = True) -> Dict[st
     Returns:
         Result dictionary with removal counts
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     original_length = len(content)
@@ -1348,7 +1344,7 @@ def register_routing_fix_tools(mcp):
     # @mcp.tool()  # Disabled - niche feature
     async def add_layer_transition_vias(
         project_path: str, via_size: float = 0.6, via_drill: float = 0.3
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add vias where tracks on different layers need to connect.
 
         Analyzes the PCB for tracks on F.Cu and B.Cu that belong to the same
@@ -1376,7 +1372,7 @@ def register_routing_fix_tools(mcp):
             return {"error": str(e)}
 
     # @mcp.tool()  # Disabled - rarely needed
-    async def remove_dangling_tracks(project_path: str) -> Dict[str, Any]:
+    async def remove_dangling_tracks(project_path: str) -> dict[str, Any]:
         """Remove track segments that aren't connected to anything.
 
         Identifies and removes track segments that have endpoints not
@@ -1402,7 +1398,7 @@ def register_routing_fix_tools(mcp):
             return {"error": str(e)}
 
     # @mcp.tool()  # Disabled - rarely needed
-    async def clear_all_tracks(project_path: str, keep_zones: bool = True) -> Dict[str, Any]:
+    async def clear_all_tracks(project_path: str, keep_zones: bool = True) -> dict[str, Any]:
         """Remove all tracks and vias from PCB for a fresh routing start.
 
         Clears all routed traces and vias to allow for complete re-routing

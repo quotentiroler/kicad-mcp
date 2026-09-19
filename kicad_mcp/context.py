@@ -2,11 +2,11 @@
 Lifespan context management for KiCad MCP Server.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Any
 import logging  # Import logging
-import os  # Added for PID
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -21,7 +21,7 @@ class KiCadAppContext:
     kicad_modules_available: bool
 
     # Optional cache for expensive operations
-    cache: Dict[str, Any]
+    cache: dict[str, Any]
 
 
 @asynccontextmanager
@@ -42,7 +42,7 @@ async def kicad_lifespan(
     Yields:
         KiCadAppContext: A typed context object shared across all handlers
     """
-    logging.info(f"Starting KiCad MCP server initialization")
+    logging.info("Starting KiCad MCP server initialization")
 
     # Resources initialization - Python path setup removed
     # print("Setting up KiCad Python modules")
@@ -52,7 +52,7 @@ async def kicad_lifespan(
     )
 
     # Create in-memory cache for expensive operations
-    cache: Dict[str, Any] = {}
+    cache: dict[str, Any] = {}
 
     # Initialize any other resources that need cleanup later
     created_temp_dirs = []  # Assuming this is managed elsewhere or not needed for now
@@ -67,14 +67,14 @@ async def kicad_lifespan(
         #         print(f"Failed to preload some KiCad modules: {str(e)}")
 
         # Yield the context to the server - server runs during this time
-        logging.info(f"KiCad MCP server initialization complete")
+        logging.info("KiCad MCP server initialization complete")
         yield KiCadAppContext(
             kicad_modules_available=kicad_modules_available,  # Pass the flag through
             cache=cache,
         )
     finally:
         # Clean up resources when server shuts down
-        logging.info(f"Shutting down KiCad MCP server")
+        logging.info("Shutting down KiCad MCP server")
 
         # Clear the cache
         if cache:
@@ -91,4 +91,4 @@ async def kicad_lifespan(
             except Exception as e:
                 logging.error(f"Error cleaning up temporary directory {temp_dir}: {str(e)}")
 
-        logging.info(f"KiCad MCP server shutdown complete")
+        logging.info("KiCad MCP server shutdown complete")

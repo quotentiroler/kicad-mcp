@@ -15,8 +15,8 @@ from typing import Any
 from fastmcp import Context, FastMCP
 
 from kicad_mcp.utils.boundary_validator import BoundaryValidator
-from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 from kicad_mcp.utils.file_utils import get_project_files
+from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 
 
 async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
@@ -89,7 +89,7 @@ async def run_drc(project_path: str, ctx: Context = None) -> dict[str, Any]:
         clearance_violations = []
 
         if os.path.exists(output_path):
-            with open(output_path, "r") as f:
+            with open(output_path) as f:
                 content = f.read()
 
             # Parse violation types

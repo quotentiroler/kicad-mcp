@@ -2,10 +2,9 @@
 Utility for managing temporary directories.
 """
 
-from typing import List
 
 # List of temporary directories to clean up
-_temp_dirs: List[str] = []
+_temp_dirs: list[str] = []
 
 
 def register_temp_dir(temp_dir: str) -> None:
@@ -18,7 +17,7 @@ def register_temp_dir(temp_dir: str) -> None:
         _temp_dirs.append(temp_dir)
 
 
-def get_temp_dirs() -> List[str]:
+def get_temp_dirs() -> list[str]:
     """Get all registered temporary directories.
 
     Returns:

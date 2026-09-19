@@ -2,17 +2,15 @@
 Export tools for KiCad projects.
 """
 
-import os
-import tempfile
-import subprocess
-import shutil
 import asyncio
-from typing import Dict, Any, Optional
+import os
+import subprocess
+from typing import Any
+
 from fastmcp import Context, FastMCP
 from fastmcp.utilities.types import Image
 
 from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.config import KICAD_APP_PATH, system
 from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
 
 
@@ -102,7 +100,7 @@ def register_export_tools(mcp: FastMCP) -> None:
             return None
 
     @mcp.tool()
-    async def refill_zones(project_path: str) -> Dict[str, Any]:
+    async def refill_zones(project_path: str) -> dict[str, Any]:
         """Refill all copper zones in the PCB.
 
         This is essential after importing routed traces from Freerouting,
@@ -156,7 +154,7 @@ def register_export_tools(mcp: FastMCP) -> None:
             return {"error": f"Failed to refill zones: {str(e)}"}
 
     @mcp.tool()
-    async def export_gerbers(project_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    async def export_gerbers(project_path: str, output_dir: str | None = None) -> dict[str, Any]:
         """Export Gerber manufacturing files for PCB fabrication.
 
         Exports all required layers: copper, mask, silk, edge cuts.
@@ -213,7 +211,7 @@ def register_export_tools(mcp: FastMCP) -> None:
             return {"error": f"Failed to export Gerbers: {str(e)}"}
 
     @mcp.tool()
-    async def export_drill(project_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    async def export_drill(project_path: str, output_dir: str | None = None) -> dict[str, Any]:
         """Export drill files for PCB fabrication.
 
         Exports Excellon drill files (.drl) for through-holes and vias.
@@ -266,7 +264,7 @@ def register_export_tools(mcp: FastMCP) -> None:
             return {"error": f"Failed to export drill files: {str(e)}"}
 
     @mcp.tool()
-    async def export_pos(project_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    async def export_pos(project_path: str, output_dir: str | None = None) -> dict[str, Any]:
         """Export pick and place file for PCB assembly.
 
         Exports component positions for automated assembly machines.
@@ -331,7 +329,7 @@ def register_export_tools(mcp: FastMCP) -> None:
             return {"error": f"Failed to export PnP file: {str(e)}"}
 
     @mcp.tool()
-    async def export_step(project_path: str, output_file: Optional[str] = None) -> Dict[str, Any]:
+    async def export_step(project_path: str, output_file: str | None = None) -> dict[str, Any]:
         """Export the board as a STEP model for mechanical CAD.
 
         Needs the 3D models wired to the footprints, and a board thickness
@@ -392,8 +390,8 @@ def register_export_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def export_spice_netlist(
-        project_path: str, output_file: Optional[str] = None
-    ) -> Dict[str, Any]:
+        project_path: str, output_file: str | None = None
+    ) -> dict[str, Any]:
         """Export the schematic as a SPICE netlist for simulation.
 
         Connectivity and values come out mechanically; active parts still

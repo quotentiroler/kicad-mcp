@@ -3,47 +3,47 @@ MCP server creation and configuration.
 """
 
 import atexit
+from collections.abc import Callable
+import functools
+import logging
 import os
 import signal
-import logging
-import functools
-from typing import Callable
+
 from fastmcp import FastMCP
-
-# Import resource handlers
-from kicad_mcp.resources.projects import register_project_resources
-from kicad_mcp.resources.files import register_file_resources
-from kicad_mcp.resources.drc_resources import register_drc_resources
-from kicad_mcp.resources.bom_resources import register_bom_resources
-from kicad_mcp.resources.netlist_resources import register_netlist_resources
-from kicad_mcp.resources.pattern_resources import register_pattern_resources
-
-
-# Import tool handlers
-from kicad_mcp.tools.project_tools import register_project_tools
-from kicad_mcp.tools.analysis_tools import register_analysis_tools
-from kicad_mcp.tools.export_tools import register_export_tools
-from kicad_mcp.tools.drc_tools import register_drc_tools
-from kicad_mcp.tools.bom_tools import register_bom_tools
-from kicad_mcp.tools.netlist_tools import register_netlist_tools
-from kicad_mcp.tools.pattern_tools import register_pattern_tools
-from kicad_mcp.tools.pcb_tools import register_pcb_tools
-from kicad_mcp.tools.routing_tools import register_routing_tools, register_routing_fix_tools
-from kicad_mcp.tools.freerouting_tools import register_freerouting_tools
-from kicad_mcp.tools.placement_tools import register_placement_tools
-from kicad_mcp.tools.placement_proposals import register_placement_proposal_tools
-from kicad_mcp.tools.jlcpcb_tools import register_jlcpcb_tools
-from kicad_mcp.tools.device_tree_tools import register_device_tree_tools
-from kicad_mcp.tools.tool_router import register_tool_router
-
-# Import prompt handlers
-from kicad_mcp.prompts.templates import register_prompts
-from kicad_mcp.prompts.drc_prompt import register_drc_prompts
-from kicad_mcp.prompts.bom_prompts import register_bom_prompts
-from kicad_mcp.prompts.pattern_prompts import register_pattern_prompts
 
 # Import context management
 from kicad_mcp.context import kicad_lifespan
+from kicad_mcp.prompts.bom_prompts import register_bom_prompts
+from kicad_mcp.prompts.drc_prompt import register_drc_prompts
+from kicad_mcp.prompts.pattern_prompts import register_pattern_prompts
+
+# Import prompt handlers
+from kicad_mcp.prompts.templates import register_prompts
+from kicad_mcp.resources.bom_resources import register_bom_resources
+from kicad_mcp.resources.drc_resources import register_drc_resources
+from kicad_mcp.resources.files import register_file_resources
+from kicad_mcp.resources.netlist_resources import register_netlist_resources
+from kicad_mcp.resources.pattern_resources import register_pattern_resources
+
+# Import resource handlers
+from kicad_mcp.resources.projects import register_project_resources
+from kicad_mcp.tools.analysis_tools import register_analysis_tools
+from kicad_mcp.tools.bom_tools import register_bom_tools
+from kicad_mcp.tools.device_tree_tools import register_device_tree_tools
+from kicad_mcp.tools.drc_tools import register_drc_tools
+from kicad_mcp.tools.export_tools import register_export_tools
+from kicad_mcp.tools.freerouting_tools import register_freerouting_tools
+from kicad_mcp.tools.jlcpcb_tools import register_jlcpcb_tools
+from kicad_mcp.tools.netlist_tools import register_netlist_tools
+from kicad_mcp.tools.pattern_tools import register_pattern_tools
+from kicad_mcp.tools.pcb_tools import register_pcb_tools
+from kicad_mcp.tools.placement_proposals import register_placement_proposal_tools
+from kicad_mcp.tools.placement_tools import register_placement_tools
+
+# Import tool handlers
+from kicad_mcp.tools.project_tools import register_project_tools
+from kicad_mcp.tools.routing_tools import register_routing_fix_tools, register_routing_tools
+from kicad_mcp.tools.tool_router import register_tool_router
 
 # Track cleanup handlers
 cleanup_handlers = []
@@ -66,7 +66,7 @@ def add_cleanup_handler(handler: Callable) -> None:
 
 def run_cleanup_handlers() -> None:
     """Run all registered cleanup handlers."""
-    logging.info(f"Running cleanup handlers...")
+    logging.info("Running cleanup handlers...")
 
     global _shutting_down
 
@@ -75,7 +75,7 @@ def run_cleanup_handlers() -> None:
         return
 
     _shutting_down = True
-    logging.info(f"Running cleanup handlers...")
+    logging.info("Running cleanup handlers...")
 
     for handler in cleanup_handlers:
         try:
@@ -91,9 +91,9 @@ def shutdown_server():
 
     if _server_instance:
         try:
-            logging.info(f"Shutting down KiCad MCP server")
+            logging.info("Shutting down KiCad MCP server")
             _server_instance = None
-            logging.info(f"KiCad MCP server shutdown complete")
+            logging.info("KiCad MCP server shutdown complete")
         except Exception as e:
             logging.error(f"Error shutting down server: {str(e)}", exc_info=True)
 
@@ -129,7 +129,7 @@ def register_signal_handlers(server: FastMCP) -> None:
 
 def create_server() -> FastMCP:
     """Create and configure the KiCad MCP server."""
-    logging.info(f"Initializing KiCad MCP server")
+    logging.info("Initializing KiCad MCP server")
 
     # Try to set up KiCad Python path - Removed
     # kicad_modules_available = setup_kicad_python_path()
@@ -140,7 +140,7 @@ def create_server() -> FastMCP:
     # else:
     # Always print this now, as we rely on CLI
     logging.info(
-        f"KiCad Python module setup removed; relying on kicad-cli for external operations."
+        "KiCad Python module setup removed; relying on kicad-cli for external operations."
     )
 
     # Build a lifespan callable with the kwarg baked in (FastMCP 2.x dropped lifespan_kwargs)
@@ -150,10 +150,10 @@ def create_server() -> FastMCP:
 
     # Initialize FastMCP server
     mcp = FastMCP("KiCad", lifespan=lifespan_factory)
-    logging.info(f"Created FastMCP server instance with lifespan management")
+    logging.info("Created FastMCP server instance with lifespan management")
 
     # Register resources
-    logging.info(f"Registering resources...")
+    logging.info("Registering resources...")
     register_project_resources(mcp)
     register_file_resources(mcp)
     register_drc_resources(mcp)
@@ -162,7 +162,7 @@ def create_server() -> FastMCP:
     register_pattern_resources(mcp)
 
     # Register tools
-    logging.info(f"Registering tools...")
+    logging.info("Registering tools...")
     register_project_tools(mcp)
     register_analysis_tools(mcp)
     register_export_tools(mcp)
@@ -181,7 +181,7 @@ def create_server() -> FastMCP:
     register_tool_router(mcp)
 
     # Register prompts
-    logging.info(f"Registering prompts...")
+    logging.info("Registering prompts...")
     register_prompts(mcp)
     register_drc_prompts(mcp)
     register_bom_prompts(mcp)
@@ -192,12 +192,13 @@ def create_server() -> FastMCP:
     atexit.register(run_cleanup_handlers)
 
     # Add specific cleanup handlers
-    add_cleanup_handler(lambda: logging.info(f"KiCad MCP server shutdown complete"))
+    add_cleanup_handler(lambda: logging.info("KiCad MCP server shutdown complete"))
 
     # Add temp directory cleanup
     def cleanup_temp_dirs():
         """Clean up any temporary directories created by the server."""
         import shutil
+
         from kicad_mcp.utils.temp_dir_manager import get_temp_dirs
 
         temp_dirs = get_temp_dirs()
@@ -213,7 +214,7 @@ def create_server() -> FastMCP:
 
     add_cleanup_handler(cleanup_temp_dirs)
 
-    logging.info(f"Server initialization complete")
+    logging.info("Server initialization complete")
     return mcp
 
 

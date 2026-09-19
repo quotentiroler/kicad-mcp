@@ -16,12 +16,12 @@ Key optimization targets:
 - Respect board boundaries
 """
 
+from collections.abc import Callable
+from dataclasses import dataclass, field
 import math
+from pathlib import Path
 import random
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional, Set
-from pathlib import Path
 
 
 @dataclass
@@ -35,7 +35,7 @@ class PadInfo:
 
     def get_absolute_pos(
         self, comp_x: float, comp_y: float, comp_angle: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Get absolute pad position given component position and angle."""
         # Rotate relative position by component angle
         angle_rad = math.radians(comp_angle)
@@ -60,14 +60,14 @@ class ComponentInfo:
     angle: float = 0.0
     layer: str = "F.Cu"
     locked: bool = False
-    nets: Set[str] = field(default_factory=set)
-    pads: List[PadInfo] = field(default_factory=list)  # Pad positions
+    nets: set[str] = field(default_factory=set)
+    pads: list[PadInfo] = field(default_factory=list)  # Pad positions
 
-    def get_pad_positions(self) -> Dict[str, Tuple[float, float]]:
+    def get_pad_positions(self) -> dict[str, tuple[float, float]]:
         """Get absolute positions of all pads."""
         return {pad.name: pad.get_absolute_pos(self.x, self.y, self.angle) for pad in self.pads}
 
-    def get_bounds(self) -> Tuple[float, float, float, float]:
+    def get_bounds(self) -> tuple[float, float, float, float]:
         """Get bounding box (minx, miny, maxx, maxy) considering rotation."""
         # Simplified - assumes 0/90/180/270 degree rotations
         if self.angle in [90, 270]:
@@ -102,9 +102,9 @@ class NetInfo:
     """Net connectivity information with pin locations."""
 
     name: str
-    pins: List[Tuple[str, str]]  # List of (component_ref, pad_name)
+    pins: list[tuple[str, str]]  # List of (component_ref, pad_name)
 
-    def compute_hpwl(self, components: Dict[str, "ComponentInfo"]) -> float:
+    def compute_hpwl(self, components: dict[str, "ComponentInfo"]) -> float:
         """
         Compute Half-Perimeter Wirelength using actual pad positions.
 
@@ -162,10 +162,10 @@ class PlacementScorer:
 
     def __init__(
         self,
-        components: Dict[str, ComponentInfo],
-        nets: Dict[str, NetInfo],
+        components: dict[str, ComponentInfo],
+        nets: dict[str, NetInfo],
         board: BoardInfo,
-        weights: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
     ):
         self.components = components
         self.nets = nets
@@ -267,7 +267,7 @@ class PlacementScorer:
 
         return variance
 
-    def score(self) -> Tuple[float, Dict[str, float]]:
+    def score(self) -> tuple[float, dict[str, float]]:
         """
         Compute total placement score (lower is better).
 
@@ -318,7 +318,7 @@ class SimulatedAnnealingPlacer:
         cooling_rate: float = 0.95,
         iterations_per_temp: int = 50,
         max_iterations: int = 5000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         self.initial_temp = initial_temp
         self.final_temp = final_temp
@@ -330,8 +330,8 @@ class SimulatedAnnealingPlacer:
             random.seed(seed)
 
     def _generate_move(
-        self, components: Dict[str, ComponentInfo], board: BoardInfo, temperature: float
-    ) -> Tuple[str, ...]:
+        self, components: dict[str, ComponentInfo], board: BoardInfo, temperature: float
+    ) -> tuple[str, ...]:
         """
         Generate a random move.
 
@@ -383,8 +383,8 @@ class SimulatedAnnealingPlacer:
         return ("none",)
 
     def _apply_move(
-        self, components: Dict[str, ComponentInfo], move: Tuple[str, ...]
-    ) -> Optional[Tuple[str, ...]]:
+        self, components: dict[str, ComponentInfo], move: tuple[str, ...]
+    ) -> tuple[str, ...] | None:
         """
         Apply a move and return undo information.
         """
@@ -413,17 +413,17 @@ class SimulatedAnnealingPlacer:
 
         return None
 
-    def _undo_move(self, components: Dict[str, ComponentInfo], undo: Tuple[str, ...]):
+    def _undo_move(self, components: dict[str, ComponentInfo], undo: tuple[str, ...]):
         """Undo a move using the undo information."""
         self._apply_move(components, undo)
 
     def optimize(
         self,
-        components: Dict[str, ComponentInfo],
-        nets: Dict[str, NetInfo],
+        components: dict[str, ComponentInfo],
+        nets: dict[str, NetInfo],
         board: BoardInfo,
-        callback: Optional[callable] = None,
-    ) -> Dict:
+        callback: Callable | None = None,
+    ) -> dict:
         """
         Run simulated annealing optimization.
 
@@ -529,7 +529,7 @@ class SimulatedAnnealingPlacer:
         }
 
 
-def extract_actual_sizes_from_kicad(pcb_path: str) -> Optional[Dict]:
+def extract_actual_sizes_from_kicad(pcb_path: str) -> dict | None:
     """
     Extract ACTUAL component sizes from KiCad using pcbnew via subprocess.
 
@@ -542,9 +542,9 @@ def extract_actual_sizes_from_kicad(pcb_path: str) -> Optional[Dict]:
     Returns:
         Dict with component sizes, or None if extraction fails
     """
+    import os
     import subprocess
     import tempfile
-    import os
 
     # Find KiCad Python
     kicad_python_paths = [
@@ -647,7 +647,7 @@ with open(r"{output_path}", "w") as f:
             return None
 
         # Read result
-        with open(output_path, "r") as f:
+        with open(output_path) as f:
             return json.load(f)
 
     except Exception as e:
@@ -665,7 +665,7 @@ with open(r"{output_path}", "w") as f:
 
 def extract_placement_from_parsed_pcb(
     pcb, pcb_path: str = None
-) -> Tuple[Dict[str, ComponentInfo], Dict[str, NetInfo], BoardInfo]:
+) -> tuple[dict[str, ComponentInfo], dict[str, NetInfo], BoardInfo]:
     """
     Extract placement information from parsed PCB data.
 
@@ -819,7 +819,7 @@ def extract_placement_from_parsed_pcb(
     return components, nets, board_info
 
 
-def estimate_footprint_size(footprint_lib: str) -> Tuple[float, float]:
+def estimate_footprint_size(footprint_lib: str) -> tuple[float, float]:
     """
     Estimate footprint BOUNDING BOX dimensions from library name.
 
@@ -897,7 +897,7 @@ def estimate_footprint_size(footprint_lib: str) -> Tuple[float, float]:
 
 def extract_placement_from_kicad(
     board,
-) -> Tuple[Dict[str, ComponentInfo], Dict[str, NetInfo], BoardInfo]:
+) -> tuple[dict[str, ComponentInfo], dict[str, NetInfo], BoardInfo]:
     """
     Extract placement information from KiCad board object.
 
@@ -1008,7 +1008,7 @@ def extract_placement_from_kicad(
 
 
 def apply_placement_to_file(
-    pcb_path: str, components: Dict[str, ComponentInfo], origin: Tuple[float, float] = (0, 0)
+    pcb_path: str, components: dict[str, ComponentInfo], origin: tuple[float, float] = (0, 0)
 ):
     """
     Apply optimized placement back to PCB file (file-based, no pcbnew).
@@ -1047,8 +1047,8 @@ def optimize_placement(
     iterations: int = 3000,
     initial_temp: float = 100.0,
     cooling_rate: float = 0.95,
-    seed: Optional[int] = None,
-) -> Dict:
+    seed: int | None = None,
+) -> dict:
     """
     Main entry point for placement optimization (file-based, no pcbnew).
 
@@ -1299,11 +1299,11 @@ Metrics:
             else:
                 report += "✓ No overlapping components\n\n"
 
-            report += f"Top 10 Longest Nets (candidates for optimization):\n"
+            report += "Top 10 Longest Nets (candidates for optimization):\n"
             for name, length, pins in net_lengths[:10]:
                 report += f"   {name}: {length:.1f}mm ({pins} pins)\n"
 
-            report += f"""
+            report += """
 Recommendations:
 """
             if breakdown["overlap"] > 0:

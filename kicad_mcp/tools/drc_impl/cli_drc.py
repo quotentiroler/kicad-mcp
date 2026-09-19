@@ -2,17 +2,16 @@
 Design Rule Check (DRC) implementation using KiCad command-line interface.
 """
 
-import os
 import json
+import os
 import subprocess
 import tempfile
-from typing import Dict, Any, Optional
+from typing import Any
 
-from kicad_mcp.config import system
 from kicad_mcp.utils.kicad_cli import find_kicad_cli
 
 
-def run_drc_via_cli_sync(pcb_file: str) -> Dict[str, Any]:
+def run_drc_via_cli_sync(pcb_file: str) -> dict[str, Any]:
     """Run DRC using KiCad command line tools (synchronous version).
 
     Args:
@@ -60,7 +59,7 @@ def run_drc_via_cli_sync(pcb_file: str) -> Dict[str, Any]:
                 return results
 
             # Read the DRC report
-            with open(output_file, "r") as f:
+            with open(output_file) as f:
                 try:
                     drc_report = json.load(f)
                 except json.JSONDecodeError:

@@ -6,9 +6,9 @@ import os
 
 from fastmcp import FastMCP
 
-from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.utils.drc_history import get_drc_history
 from kicad_mcp.tools.drc_impl.cli_drc import run_drc_via_cli_sync
+from kicad_mcp.utils.drc_history import get_drc_history
+from kicad_mcp.utils.file_utils import get_project_files
 
 
 def register_drc_resources(mcp: FastMCP) -> None:
@@ -178,7 +178,7 @@ def register_drc_resources(mcp: FastMCP) -> None:
 
         # Add summary
         total_violations = drc_results.get("total_violations", 0)
-        report += f"## Summary\n\n"
+        report += "## Summary\n\n"
 
         if total_violations == 0:
             report += "✅ **No DRC violations found**\n\n"

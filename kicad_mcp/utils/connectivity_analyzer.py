@@ -7,11 +7,11 @@ Performs coordinate-based wire-to-pin connection validation by:
 3. Matching wire endpoints to pin positions
 """
 
+from collections import defaultdict
+import math
 import os
 import re
-import math
-from typing import Any, Dict, List, Tuple, Optional
-from collections import defaultdict
+from typing import Any
 
 
 class ConnectivityAnalyzer:
@@ -30,17 +30,17 @@ class ConnectivityAnalyzer:
         self.content = ""
 
         # Parsed data
-        self.lib_symbols: Dict[str, Dict] = {}  # lib_id -> {pins: {pin_num: (x, y, angle)}}
-        self.components: List[Dict] = []  # Component instances
-        self.wires: List[Dict] = []  # Wire segments
-        self.labels: List[Dict] = []  # Labels (local + global)
-        self.junctions: List[Dict] = []  # Junction points
+        self.lib_symbols: dict[str, dict] = {}  # lib_id -> {pins: {pin_num: (x, y, angle)}}
+        self.components: list[dict] = []  # Component instances
+        self.wires: list[dict] = []  # Wire segments
+        self.labels: list[dict] = []  # Labels (local + global)
+        self.junctions: list[dict] = []  # Junction points
 
         # Analysis results
-        self.pin_positions: Dict[str, Tuple[float, float]] = {}  # "ref.pin" -> (x, y)
-        self.wire_connections: Dict[str, List[str]] = defaultdict(list)  # "ref.pin" -> [wire_ids]
-        self.unconnected_pins: List[str] = []
-        self.connected_pins: List[str] = []
+        self.pin_positions: dict[str, tuple[float, float]] = {}  # "ref.pin" -> (x, y)
+        self.wire_connections: dict[str, list[str]] = defaultdict(list)  # "ref.pin" -> [wire_ids]
+        self.unconnected_pins: list[str] = []
+        self.connected_pins: list[str] = []
 
         self._load_schematic()
 
@@ -49,10 +49,10 @@ class ConnectivityAnalyzer:
         if not os.path.exists(self.schematic_path):
             raise FileNotFoundError(f"Schematic file not found: {self.schematic_path}")
 
-        with open(self.schematic_path, "r", encoding="utf-8") as f:
+        with open(self.schematic_path, encoding="utf-8") as f:
             self.content = f.read()
 
-    def analyze(self) -> Dict[str, Any]:
+    def analyze(self) -> dict[str, Any]:
         """Perform full connectivity analysis.
 
         Returns:
@@ -219,7 +219,7 @@ class ConnectivityAnalyzer:
                 }
             )
 
-    def _rotate_point(self, x: float, y: float, angle_deg: float) -> Tuple[float, float]:
+    def _rotate_point(self, x: float, y: float, angle_deg: float) -> tuple[float, float]:
         """Rotate a point around origin by angle in degrees."""
         if angle_deg == 0:
             return (x, y)
@@ -312,10 +312,7 @@ class ConnectivityAnalyzer:
                 end_x, end_y = wire["end"]["x"], wire["end"]["y"]
 
                 # Check if wire starts or ends at this pin
-                if self._coords_match(start_x, start_y, pin_x, pin_y):
-                    self.wire_connections[pin_key].append(wire["id"])
-                    connected = True
-                elif self._coords_match(end_x, end_y, pin_x, pin_y):
+                if self._coords_match(start_x, start_y, pin_x, pin_y) or self._coords_match(end_x, end_y, pin_x, pin_y):
                     self.wire_connections[pin_key].append(wire["id"])
                     connected = True
 
@@ -324,7 +321,7 @@ class ConnectivityAnalyzer:
             else:
                 self.unconnected_pins.append(pin_key)
 
-    def _build_results(self) -> Dict[str, Any]:
+    def _build_results(self) -> dict[str, Any]:
         """Build the analysis results dictionary."""
         # Group connections by component
         component_connections = defaultdict(dict)
@@ -362,7 +359,7 @@ class ConnectivityAnalyzer:
         }
 
 
-def analyze_connectivity(schematic_path: str) -> Dict[str, Any]:
+def analyze_connectivity(schematic_path: str) -> dict[str, Any]:
     """Analyze wire-to-pin connectivity in a KiCad schematic.
 
     Args:

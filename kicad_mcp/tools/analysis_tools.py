@@ -3,8 +3,9 @@ Analysis and validation tools for KiCad projects.
 """
 
 import os
-from typing import Dict, Any, Optional
-from fastmcp import Context, FastMCP
+from typing import Any
+
+from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 
@@ -17,7 +18,7 @@ def register_analysis_tools(mcp: FastMCP) -> None:
     """
 
     @mcp.tool()
-    def validate_project(project_path: str) -> Dict[str, Any]:
+    def validate_project(project_path: str) -> dict[str, Any]:
         """Basic validation of a KiCad project."""
         if not os.path.exists(project_path):
             return {"valid": False, "error": f"Project not found: {project_path}"}
@@ -34,7 +35,7 @@ def register_analysis_tools(mcp: FastMCP) -> None:
 
         # Validate project file
         try:
-            with open(project_path, "r") as f:
+            with open(project_path) as f:
                 import json
 
                 json.load(f)

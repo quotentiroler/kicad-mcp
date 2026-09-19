@@ -2,17 +2,15 @@
 Bill of Materials (BOM) resources for KiCad projects.
 """
 
-import os
-import csv
 import json
-import pandas as pd
-from typing import Dict, List, Any, Optional
-from fastmcp import FastMCP
+import os
 
-from kicad_mcp.utils.file_utils import get_project_files
+from fastmcp import FastMCP
+import pandas as pd
 
 # Import the helper functions from bom_tools.py to avoid code duplication
-from kicad_mcp.tools.bom_tools import parse_bom_file, analyze_bom_data
+from kicad_mcp.tools.bom_tools import analyze_bom_data, parse_bom_file
+from kicad_mcp.utils.file_utils import get_project_files
 
 
 def register_bom_resources(mcp: FastMCP) -> None:
@@ -211,7 +209,7 @@ def register_bom_resources(mcp: FastMCP) -> None:
         try:
             # If it's already a CSV, just return its contents
             if file_path.lower().endswith(".csv"):
-                with open(file_path, "r", encoding="utf-8-sig") as f:
+                with open(file_path, encoding="utf-8-sig") as f:
                     return f.read()
 
             # Otherwise, try to parse and convert to CSV
@@ -264,7 +262,7 @@ def register_bom_resources(mcp: FastMCP) -> None:
             for file_type, file_path in bom_files.items():
                 # If it's already JSON, parse it directly
                 if file_path.lower().endswith(".json"):
-                    with open(file_path, "r") as f:
+                    with open(file_path) as f:
                         try:
                             result["bom_files"][file_type] = json.load(f)
                             continue

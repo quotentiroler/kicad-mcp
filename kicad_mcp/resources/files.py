@@ -3,6 +3,7 @@ File content resources for KiCad files.
 """
 
 import os
+
 from fastmcp import FastMCP
 
 
@@ -22,7 +23,7 @@ def register_file_resources(mcp: FastMCP) -> None:
         # KiCad schematic files are in S-expression format (not JSON)
         # This is a basic extraction of text-based information
         try:
-            with open(schematic_path, "r") as f:
+            with open(schematic_path) as f:
                 content = f.read()
 
             # Basic extraction of components

@@ -4,12 +4,12 @@ Utilities for tracking DRC history for KiCad projects.
 This will allow users to compare DRC results over time.
 """
 
-import os
+from datetime import datetime
 import json
+import os
 import platform
 import time
-from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 # Directory for storing DRC history
 if platform.system() == "Windows":
@@ -44,7 +44,7 @@ def get_project_history_path(project_path: str) -> str:
     return os.path.join(DRC_HISTORY_DIR, history_filename)
 
 
-def save_drc_result(project_path: str, drc_result: Dict[str, Any]) -> None:
+def save_drc_result(project_path: str, drc_result: dict[str, Any]) -> None:
     """Save a DRC result to the project's history.
 
     Args:
@@ -68,9 +68,9 @@ def save_drc_result(project_path: str, drc_result: Dict[str, Any]) -> None:
     # Load existing history or create new
     if os.path.exists(history_path):
         try:
-            with open(history_path, "r") as f:
+            with open(history_path) as f:
                 history = json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             print(f"Error loading DRC history: {str(e)}")
             history = {"project_path": project_path, "entries": []}
     else:
@@ -89,11 +89,11 @@ def save_drc_result(project_path: str, drc_result: Dict[str, Any]) -> None:
         with open(history_path, "w") as f:
             json.dump(history, f, indent=2)
         print(f"Saved DRC history entry to {history_path}")
-    except IOError as e:
+    except OSError as e:
         print(f"Error saving DRC history: {str(e)}")
 
 
-def get_drc_history(project_path: str) -> List[Dict[str, Any]]:
+def get_drc_history(project_path: str) -> list[dict[str, Any]]:
     """Get the DRC history for a project.
 
     Args:
@@ -109,7 +109,7 @@ def get_drc_history(project_path: str) -> List[Dict[str, Any]]:
         return []
 
     try:
-        with open(history_path, "r") as f:
+        with open(history_path) as f:
             history = json.load(f)
 
         # Sort entries by timestamp (newest first)
@@ -118,14 +118,14 @@ def get_drc_history(project_path: str) -> List[Dict[str, Any]]:
         )
 
         return entries
-    except (json.JSONDecodeError, IOError) as e:
+    except (OSError, json.JSONDecodeError) as e:
         print(f"Error reading DRC history: {str(e)}")
         return []
 
 
 def compare_with_previous(
-    project_path: str, current_result: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+    project_path: str, current_result: dict[str, Any]
+) -> dict[str, Any] | None:
     """Compare current DRC result with the previous one.
 
     Args:

@@ -2,12 +2,13 @@
 Bill of Materials (BOM) processing tools for KiCad projects.
 """
 
-import os
 import csv
 import json
-import pandas as pd
-from typing import Dict, List, Any, Optional, Tuple
+import os
+from typing import Any
+
 from fastmcp import Context, FastMCP
+import pandas as pd
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.kicad_cli import KiCadCLIError, get_kicad_cli_path
@@ -21,7 +22,7 @@ def register_bom_tools(mcp: FastMCP) -> None:
     """
 
     @mcp.tool()
-    async def analyze_bom(project_path: str, ctx: Context = None) -> Dict[str, Any]:
+    async def analyze_bom(project_path: str, ctx: Context = None) -> dict[str, Any]:
         """Analyze a KiCad project's Bill of Materials.
 
         This tool will look for BOM files related to a KiCad project and provide
@@ -162,7 +163,7 @@ def register_bom_tools(mcp: FastMCP) -> None:
         return results
 
     @mcp.tool()
-    async def export_bom_csv(project_path: str, ctx: Context = None) -> Dict[str, Any]:
+    async def export_bom_csv(project_path: str, ctx: Context = None) -> dict[str, Any]:
         """Export a Bill of Materials for a KiCad project.
 
         This tool attempts to generate a CSV BOM file for a KiCad project.
@@ -259,7 +260,7 @@ def register_bom_tools(mcp: FastMCP) -> None:
 # Helper functions for BOM processing
 
 
-def parse_bom_file(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def parse_bom_file(file_path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Parse a BOM file and detect its format.
 
     Args:
@@ -285,7 +286,7 @@ def parse_bom_file(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]
     try:
         if ext == ".csv":
             # Try to parse as CSV
-            with open(file_path, "r", encoding="utf-8-sig") as f:
+            with open(file_path, encoding="utf-8-sig") as f:
                 # Read a few lines to analyze the format
                 sample = "".join([f.readline() for _ in range(10)])
                 f.seek(0)  # Reset file pointer
@@ -343,7 +344,7 @@ def parse_bom_file(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]
 
         elif ext == ".json":
             # Parse JSON
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 data = json.load(f)
 
             format_info["detected_format"] = "json"
@@ -359,7 +360,7 @@ def parse_bom_file(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]
         else:
             # Unknown format, try generic CSV parsing as fallback
             try:
-                with open(file_path, "r", encoding="utf-8-sig") as f:
+                with open(file_path, encoding="utf-8-sig") as f:
                     reader = csv.DictReader(f)
                     format_info["header_fields"] = reader.fieldnames if reader.fieldnames else []
                     format_info["detected_format"] = "unknown_csv"
@@ -388,8 +389,8 @@ def parse_bom_file(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]
 
 
 def analyze_bom_data(
-    components: List[Dict[str, Any]], format_info: Dict[str, Any]
-) -> Dict[str, Any]:
+    components: list[dict[str, Any]], format_info: dict[str, Any]
+) -> dict[str, Any]:
     """Analyze component data from a BOM file.
 
     Args:
@@ -602,7 +603,7 @@ def analyze_bom_data(
 
 async def export_bom_with_python(
     schematic_file: str, output_dir: str, project_name: str, ctx: Context = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Export a BOM using KiCad Python modules.
 
     Args:
@@ -647,7 +648,7 @@ async def export_bom_with_python(
 
 async def export_bom_with_cli(
     schematic_file: str, output_dir: str, project_name: str, ctx: Context = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Export a BOM using KiCad command-line tools.
 
     Args:
@@ -659,8 +660,8 @@ async def export_bom_with_cli(
     Returns:
         Dictionary with export results
     """
-    import subprocess
     import platform
+    import subprocess
 
     system = platform.system()
     print(f"Exporting BOM using CLI tools on {system}")
@@ -710,7 +711,7 @@ async def export_bom_with_cli(
             await ctx.report_progress(80, 100)
 
         # Read the first few lines of the BOM to verify it's valid
-        with open(output_file, "r") as f:
+        with open(output_file) as f:
             bom_content = f.read(1024)  # Read first 1KB
 
         if len(bom_content.strip()) == 0:

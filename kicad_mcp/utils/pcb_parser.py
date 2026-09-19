@@ -4,11 +4,10 @@ PCB file parser and writer for KiCad .kicad_pcb files.
 Handles S-expression format for reading and modifying PCB layouts.
 """
 
+from dataclasses import dataclass, field
+import logging
 import os
 import re
-import logging
-from typing import Any
-from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +147,7 @@ def parse_pcb_file(pcb_path: str) -> PCBData:
     if not os.path.exists(pcb_path):
         raise FileNotFoundError(f"PCB file not found: {pcb_path}")
 
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     pcb = PCBData(raw_content=content)
@@ -359,7 +358,7 @@ def add_footprint_to_pcb(pcb_path: str, footprint: Footprint) -> bool:
     Returns:
         True if successful
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     # Find insertion point (before the final closing paren)
@@ -403,7 +402,7 @@ def update_footprint_position(
     Returns:
         True if successful
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     # Find all footprint blocks by looking for (footprint followed by (property "Reference" "XXX"
@@ -500,7 +499,7 @@ def update_footprint_position(
 
 def add_track_to_pcb(pcb_path: str, track: Track) -> bool:
     """Add a track segment to an existing PCB file."""
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     insert_pos = content.rfind(")")
@@ -520,7 +519,7 @@ def add_track_to_pcb(pcb_path: str, track: Track) -> bool:
 
 def add_via_to_pcb(pcb_path: str, via: Via) -> bool:
     """Add a via to an existing PCB file."""
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     insert_pos = content.rfind(")")
@@ -636,7 +635,7 @@ def read_footprint_from_library(footprint_lib: str) -> str | None:
         return None
 
     try:
-        with open(fp_file, "r", encoding="utf-8") as f:
+        with open(fp_file, encoding="utf-8") as f:
             content = f.read()
         return content
     except Exception as e:
@@ -737,7 +736,7 @@ def import_footprints_from_schematic(
     Returns:
         Dict with import results
     """
-    with open(pcb_path, "r", encoding="utf-8") as f:
+    with open(pcb_path, encoding="utf-8") as f:
         content = f.read()
 
     # Parse existing footprints to avoid duplicates

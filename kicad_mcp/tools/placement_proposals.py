@@ -17,13 +17,13 @@ Generates 3 placement candidates:
 
 # pcbnew is imported lazily inside functions to avoid import errors
 # when the MCP server starts (pcbnew only available in KiCad's Python)
-import math
-import random
 import copy
-from dataclasses import dataclass, field
-from typing import List, Dict, Tuple, Optional, Set, Any
-from pathlib import Path
+from dataclasses import dataclass
 import logging
+import math
+from pathlib import Path
+import random
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class BoundingBox:
         return self.bottom - self.top
 
     @property
-    def center(self) -> Tuple[float, float]:
+    def center(self) -> tuple[float, float]:
         return ((self.left + self.right) / 2, (self.top + self.bottom) / 2)
 
     def intersects(self, other: "BoundingBox", clearance: float = 0) -> bool:
@@ -96,7 +96,7 @@ class ComponentInfo:
     y: float
     rotation: float  # degrees
     bbox: BoundingBox  # actual footprint bounds (relative to center)
-    pads: List[PadInfo]
+    pads: list[PadInfo]
     locked: bool = False
     is_ic: bool = False
     is_capacitor: bool = False
@@ -119,7 +119,7 @@ class ComponentInfo:
 
     def get_pad_positions_at(
         self, x: float, y: float, rotation: float = None
-    ) -> List[Tuple[str, float, float, str]]:
+    ) -> list[tuple[str, float, float, str]]:
         """Get pad positions if component were at (x, y)."""
         if rotation is None:
             rotation = self.rotation
@@ -141,10 +141,10 @@ class ComponentInfo:
 class PlacementState:
     """Current state of all component placements."""
 
-    components: Dict[str, ComponentInfo]
+    components: dict[str, ComponentInfo]
     board_bbox: BoundingBox
 
-    def get_component_bbox(self, ref: str) -> Optional[BoundingBox]:
+    def get_component_bbox(self, ref: str) -> BoundingBox | None:
         comp = self.components.get(ref)
         if comp:
             return comp.get_bbox_at(comp.x, comp.y, comp.rotation)
@@ -193,7 +193,7 @@ class NetInfo:
     """Information about a net."""
 
     name: str
-    pad_refs: List[Tuple[str, str]]  # (component_ref, pad_name)
+    pad_refs: list[tuple[str, str]]  # (component_ref, pad_name)
     is_power: bool = False
     is_ground: bool = False
 
@@ -241,7 +241,7 @@ class PlacementAnalyzer:
 
         logger.info(f"Analyzed board: {len(self.components)} components, {len(self.nets)} nets")
 
-    def _extract_components(self) -> Dict[str, ComponentInfo]:
+    def _extract_components(self) -> dict[str, ComponentInfo]:
         """Extract complete component information including footprint bounds."""
         import pcbnew  # Lazy import for layer constants
 
@@ -309,7 +309,7 @@ class PlacementAnalyzer:
 
         return components
 
-    def _extract_nets(self) -> Dict[str, NetInfo]:
+    def _extract_nets(self) -> dict[str, NetInfo]:
         """Extract net information."""
         nets = {}
 
@@ -374,7 +374,7 @@ class PlacementAnalyzer:
 
     def calculate_congestion_map(
         self, state: PlacementState, grid_size: int = 8
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Calculate routing congestion per grid cell."""
         cell_w = (self.board_bbox.right - self.board_bbox.left) / grid_size
         cell_h = (self.board_bbox.bottom - self.board_bbox.top) / grid_size
@@ -523,7 +523,7 @@ class PlacementOptimizer:
 
     def _find_valid_nearby_position(
         self, state: PlacementState, ref: str, target_x: float, target_y: float, max_tries: int = 20
-    ) -> Optional[Tuple[float, float]]:
+    ) -> tuple[float, float] | None:
         """Find a valid position near the target."""
         comp = state.components.get(ref)
         if not comp:
@@ -729,7 +729,7 @@ class PlacementOptimizer:
         return best_state
 
 
-def propose_layouts(project_path: str, iterations: int = 3000) -> Dict[str, Any]:
+def propose_layouts(project_path: str, iterations: int = 3000) -> dict[str, Any]:
     """
     Generate 3 placement proposals optimized for routability.
 
@@ -940,7 +940,7 @@ def propose_layouts(project_path: str, iterations: int = 3000) -> Dict[str, Any]
     }
 
 
-def apply_layout(project_path: str, placements: List[Dict]) -> Dict[str, Any]:
+def apply_layout(project_path: str, placements: list[dict]) -> dict[str, Any]:
     """
     Apply a proposed layout to the PCB using pcbnew API.
 
@@ -1002,7 +1002,7 @@ def register_placement_proposal_tools(mcp):
     @mcp.tool()
     async def propose_placement_layouts(
         project_path: str, iterations: int = 3000
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate 3 optimized component placement proposals.
 
         Analyzes the current PCB layout and generates 3 alternative placements
@@ -1021,14 +1021,15 @@ def register_placement_proposal_tools(mcp):
         Returns:
             Dictionary with current scores and 3 ranked proposals
         """
+        import copy
+        from pathlib import Path
+
         from ..utils.pcb_parser import parse_pcb_file
         from .placement_tools import (
-            extract_placement_from_parsed_pcb,
-            SimulatedAnnealingPlacer,
             PlacementScorer,
+            SimulatedAnnealingPlacer,
+            extract_placement_from_parsed_pcb,
         )
-        from pathlib import Path
-        import copy
 
         try:
             pcb_path = Path(project_path).with_suffix(".kicad_pcb")
@@ -1122,7 +1123,7 @@ def register_placement_proposal_tools(mcp):
             return {"error": str(e), "traceback": traceback.format_exc()}
 
     @mcp.tool()
-    async def apply_placement_layout(project_path: str, placements: List[Dict]) -> Dict[str, Any]:
+    async def apply_placement_layout(project_path: str, placements: list[dict]) -> dict[str, Any]:
         """Apply a placement layout to the PCB.
 
         Moves components to the specified positions. Use this with the
@@ -1136,8 +1137,9 @@ def register_placement_proposal_tools(mcp):
         Returns:
             Success status and count of moved components
         """
-        from ..utils.pcb_parser import update_footprint_position, parse_pcb_file, get_board_bounds
         from pathlib import Path
+
+        from ..utils.pcb_parser import get_board_bounds, parse_pcb_file, update_footprint_position
 
         pcb_path = str(Path(project_path).with_suffix(".kicad_pcb"))
 

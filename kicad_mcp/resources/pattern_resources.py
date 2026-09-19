@@ -3,17 +3,18 @@ Circuit pattern recognition resources for KiCad schematics.
 """
 
 import os
+
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
 from kicad_mcp.utils.netlist_parser import extract_netlist
 from kicad_mcp.utils.pattern_recognition import (
-    identify_power_supplies,
     identify_amplifiers,
-    identify_filters,
-    identify_oscillators,
     identify_digital_interfaces,
+    identify_filters,
     identify_microcontrollers,
+    identify_oscillators,
+    identify_power_supplies,
     identify_sensor_interfaces,
 )
 
@@ -73,7 +74,7 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                 + len(sensor_interfaces)
             )
 
-            report += f"## Summary\n\n"
+            report += "## Summary\n\n"
             report += f"- **Total Components**: {netlist_data['component_count']}\n"
             report += f"- **Total Circuit Patterns Identified**: {total_patterns}\n\n"
 
@@ -96,13 +97,13 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                     report += f"### Power Supply {i}: {ps_subtype.upper() if ps_subtype else ps_type.title()}\n\n"
 
                     if ps_type == "linear_regulator":
-                        report += f"- **Type**: Linear Voltage Regulator\n"
+                        report += "- **Type**: Linear Voltage Regulator\n"
                         report += f"- **Subtype**: {ps_subtype}\n"
                         report += f"- **Main Component**: {ps.get('main_component', 'Unknown')}\n"
                         report += f"- **Value**: {ps.get('value', 'Unknown')}\n"
                         report += f"- **Output Voltage**: {ps.get('output_voltage', 'Unknown')}\n"
                     elif ps_type == "switching_regulator":
-                        report += f"- **Type**: Switching Voltage Regulator\n"
+                        report += "- **Type**: Switching Voltage Regulator\n"
                         report += (
                             f"- **Topology**: {ps_subtype.title() if ps_subtype else 'Unknown'}\n"
                         )
@@ -121,17 +122,17 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                     report += f"### Amplifier {i}: {amp_subtype.upper() if amp_subtype else amp_type.title()}\n\n"
 
                     if amp_type == "operational_amplifier":
-                        report += f"- **Type**: Operational Amplifier\n"
+                        report += "- **Type**: Operational Amplifier\n"
                         report += f"- **Subtype**: {amp_subtype.replace('_', ' ').title() if amp_subtype else 'General Purpose'}\n"
                         report += f"- **Component**: {amp.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {amp.get('value', 'Unknown')}\n"
                     elif amp_type == "transistor_amplifier":
-                        report += f"- **Type**: Transistor Amplifier\n"
+                        report += "- **Type**: Transistor Amplifier\n"
                         report += f"- **Transistor Type**: {amp_subtype}\n"
                         report += f"- **Component**: {amp.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {amp.get('value', 'Unknown')}\n"
                     elif amp_type == "audio_amplifier_ic":
-                        report += f"- **Type**: Audio Amplifier IC\n"
+                        report += "- **Type**: Audio Amplifier IC\n"
                         report += f"- **Component**: {amp.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {amp.get('value', 'Unknown')}\n"
 
@@ -146,19 +147,19 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                     report += f"### Filter {i}: {filt_subtype.upper() if filt_subtype else filt_type.title()}\n\n"
 
                     if filt_type == "passive_filter":
-                        report += f"- **Type**: Passive Filter\n"
+                        report += "- **Type**: Passive Filter\n"
                         report += f"- **Topology**: {filt_subtype.replace('_', ' ').upper() if filt_subtype else 'Unknown'}\n"
                         report += f"- **Components**: {', '.join(filt.get('components', []))}\n"
                     elif filt_type == "active_filter":
-                        report += f"- **Type**: Active Filter\n"
+                        report += "- **Type**: Active Filter\n"
                         report += f"- **Main Component**: {filt.get('main_component', 'Unknown')}\n"
                         report += f"- **Value**: {filt.get('value', 'Unknown')}\n"
                     elif filt_type == "crystal_filter":
-                        report += f"- **Type**: Crystal Filter\n"
+                        report += "- **Type**: Crystal Filter\n"
                         report += f"- **Component**: {filt.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {filt.get('value', 'Unknown')}\n"
                     elif filt_type == "ceramic_filter":
-                        report += f"- **Type**: Ceramic Filter\n"
+                        report += "- **Type**: Ceramic Filter\n"
                         report += f"- **Component**: {filt.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {filt.get('value', 'Unknown')}\n"
 
@@ -173,18 +174,18 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                     report += f"### Oscillator {i}: {osc_subtype.upper() if osc_subtype else osc_type.title()}\n\n"
 
                     if osc_type == "crystal_oscillator":
-                        report += f"- **Type**: Crystal Oscillator\n"
+                        report += "- **Type**: Crystal Oscillator\n"
                         report += f"- **Component**: {osc.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {osc.get('value', 'Unknown')}\n"
                         report += f"- **Frequency**: {osc.get('frequency', 'Unknown')}\n"
                         report += f"- **Has Load Capacitors**: {'Yes' if osc.get('has_load_capacitors', False) else 'No'}\n"
                     elif osc_type == "oscillator_ic":
-                        report += f"- **Type**: Oscillator IC\n"
+                        report += "- **Type**: Oscillator IC\n"
                         report += f"- **Component**: {osc.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {osc.get('value', 'Unknown')}\n"
                         report += f"- **Frequency**: {osc.get('frequency', 'Unknown')}\n"
                     elif osc_type == "rc_oscillator":
-                        report += f"- **Type**: RC Oscillator\n"
+                        report += "- **Type**: RC Oscillator\n"
                         report += f"- **Subtype**: {osc_subtype.replace('_', ' ').title() if osc_subtype else 'Unknown'}\n"
                         report += f"- **Component**: {osc.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {osc.get('value', 'Unknown')}\n"
@@ -212,7 +213,7 @@ def register_pattern_resources(mcp: FastMCP) -> None:
 
                     if mcu_type == "microcontroller":
                         report += f"### Microcontroller {i}: {mcu.get('model', mcu.get('family', 'Unknown'))}\n\n"
-                        report += f"- **Type**: Microcontroller\n"
+                        report += "- **Type**: Microcontroller\n"
                         report += f"- **Family**: {mcu.get('family', 'Unknown')}\n"
                         if "model" in mcu:
                             report += f"- **Model**: {mcu['model']}\n"
@@ -225,7 +226,7 @@ def register_pattern_resources(mcp: FastMCP) -> None:
                         report += (
                             f"### Development Board {i}: {mcu.get('board_type', 'Unknown')}\n\n"
                         )
-                        report += f"- **Type**: Development Board\n"
+                        report += "- **Type**: Development Board\n"
                         report += f"- **Board Type**: {mcu.get('board_type', 'Unknown')}\n"
                         report += f"- **Component**: {mcu.get('component', 'Unknown')}\n"
                         report += f"- **Value**: {mcu.get('value', 'Unknown')}\n"

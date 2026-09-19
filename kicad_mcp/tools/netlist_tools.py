@@ -3,11 +3,12 @@ Netlist extraction and analysis tools for KiCad schematics.
 """
 
 import os
-from typing import Dict, Any
+from typing import Any
+
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
-from kicad_mcp.utils.netlist_parser import extract_netlist, analyze_netlist
+from kicad_mcp.utils.netlist_parser import analyze_netlist, extract_netlist
 
 
 def register_netlist_tools(mcp: FastMCP) -> None:
@@ -18,7 +19,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
     """
 
     # Internal function - use extract_project_netlist instead
-    def _extract_schematic_netlist_impl(schematic_path: str) -> Dict[str, Any]:
+    def _extract_schematic_netlist_impl(schematic_path: str) -> dict[str, Any]:
         """Internal: Extract netlist information from a KiCad schematic."""
         print(f"Extracting netlist from schematic: {schematic_path}")
 
@@ -62,7 +63,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": str(e)}
 
     @mcp.tool()
-    def extract_project_netlist(project_path: str) -> Dict[str, Any]:
+    def extract_project_netlist(project_path: str) -> dict[str, Any]:
         """Extract netlist from a KiCad project's schematic.
 
         This tool finds the schematic associated with a KiCad project
@@ -105,7 +106,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": str(e)}
 
     @mcp.tool()
-    def analyze_schematic_connections(schematic_path: str) -> Dict[str, Any]:
+    def analyze_schematic_connections(schematic_path: str) -> dict[str, Any]:
         """Analyze connections in a KiCad schematic.
 
         This tool provides detailed analysis of component connections,
@@ -190,7 +191,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": str(e)}
 
     @mcp.tool()
-    def find_component_connections(project_path: str, component_ref: str) -> Dict[str, Any]:
+    def find_component_connections(project_path: str, component_ref: str) -> dict[str, Any]:
         """Find all connections for a specific component in a KiCad project.
 
         This tool extracts information about how a specific component
@@ -321,7 +322,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
             print(f"Error finding component connections: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    def _validate_wire_connections_impl(schematic_path: str) -> Dict[str, Any]:
+    def _validate_wire_connections_impl(schematic_path: str) -> dict[str, Any]:
         """Internal implementation of wire connection validation."""
         print(f"Validating wire connections in schematic: {schematic_path}")
 
@@ -352,7 +353,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": str(e)}
 
     @mcp.tool()
-    def validate_wire_connections(schematic_path: str) -> Dict[str, Any]:
+    def validate_wire_connections(schematic_path: str) -> dict[str, Any]:
         """Validate wire-to-pin connectivity using coordinate matching.
 
         This tool performs precise coordinate-based analysis to determine
@@ -380,7 +381,7 @@ def register_netlist_tools(mcp: FastMCP) -> None:
         return _validate_wire_connections_impl(schematic_path)
 
     @mcp.tool()
-    def validate_project_wire_connections(project_path: str) -> Dict[str, Any]:
+    def validate_project_wire_connections(project_path: str) -> dict[str, Any]:
         """Validate wire-to-pin connectivity for a KiCad project.
 
         Finds the schematic associated with a project and validates

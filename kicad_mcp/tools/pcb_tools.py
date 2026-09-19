@@ -4,27 +4,23 @@ PCB layout tools for KiCad MCP Server.
 Provides tools for component placement, trace routing, and PCB management.
 """
 
-import os
 import logging
-import subprocess
 from typing import Any
+
 from fastmcp import FastMCP
 
 from kicad_mcp.utils.file_utils import get_project_files
+from kicad_mcp.utils.netlist_parser import extract_netlist
 from kicad_mcp.utils.pcb_parser import (
-    parse_pcb_file,
-    update_footprint_position,
-    add_track_to_pcb,
-    add_via_to_pcb,
-    get_net_id_by_name,
-    get_board_bounds,
-    import_footprints_from_schematic,
     Track,
     Via,
-    PCBData,
+    add_track_to_pcb,
+    add_via_to_pcb,
+    get_board_bounds,
+    get_net_id_by_name,
+    parse_pcb_file,
+    update_footprint_position,
 )
-from kicad_mcp.utils.netlist_parser import extract_netlist
-from kicad_mcp.utils.kicad_cli import get_kicad_cli_path, is_kicad_cli_available
 
 logger = logging.getLogger(__name__)
 
@@ -368,9 +364,7 @@ def _register_pcb_layout_tools(mcp: FastMCP) -> None:
                 if ref.startswith("U"):
                     if "nrf" in value or "mcu" in footprint or "qfn-73" in footprint:
                         categories["mcu"].append(comp)
-                    elif "afe" in value or "ppg" in footprint:
-                        categories["sensors"].append(comp)
-                    elif "lsm" in value or "imu" in footprint:
+                    elif "afe" in value or "ppg" in footprint or "lsm" in value or "imu" in footprint:
                         categories["sensors"].append(comp)
                     elif "ldo" in value or "regulator" in footprint:
                         categories["power"].append(comp)

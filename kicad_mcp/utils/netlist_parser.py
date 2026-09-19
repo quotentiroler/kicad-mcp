@@ -2,10 +2,10 @@
 KiCad schematic netlist extraction utilities.
 """
 
+from collections import defaultdict
 import os
 import re
-from typing import Any, Dict, List
-from collections import defaultdict
+from typing import Any
 
 
 class SchematicParser:
@@ -45,14 +45,14 @@ class SchematicParser:
             raise FileNotFoundError(f"Schematic file not found: {self.schematic_path}")
 
         try:
-            with open(self.schematic_path, "r") as f:
+            with open(self.schematic_path) as f:
                 self.content = f.read()
                 print(f"Successfully loaded schematic: {self.schematic_path}")
         except Exception as e:
             print(f"Error reading schematic file: {str(e)}")
             raise
 
-    def parse(self) -> Dict[str, Any]:
+    def parse(self) -> dict[str, Any]:
         """Parse the schematic to extract netlist information.
 
         Returns:
@@ -98,7 +98,7 @@ class SchematicParser:
         )
         return result
 
-    def _extract_s_expressions(self, pattern: str) -> List[str]:
+    def _extract_s_expressions(self, pattern: str) -> list[str]:
         """Extract all matching S-expressions from the schematic content.
 
         Args:
@@ -185,7 +185,7 @@ class SchematicParser:
 
         print(f"Extracted {len(self.components)} component instances")
 
-    def _parse_component(self, symbol_expr: str) -> Dict[str, Any]:
+    def _parse_component(self, symbol_expr: str) -> dict[str, Any]:
         """Parse a component from a symbol S-expression.
 
         Args:
@@ -441,7 +441,7 @@ class SchematicParser:
         print(f"Found {len(self.nets)} potential nets from labels and power symbols")
 
 
-def extract_netlist(schematic_path: str) -> Dict[str, Any]:
+def extract_netlist(schematic_path: str) -> dict[str, Any]:
     """Extract netlist information from a KiCad schematic file.
 
     Args:
@@ -458,7 +458,7 @@ def extract_netlist(schematic_path: str) -> Dict[str, Any]:
         return {"error": str(e), "components": {}, "nets": {}, "component_count": 0, "net_count": 0}
 
 
-def analyze_netlist(netlist_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_netlist(netlist_data: dict[str, Any]) -> dict[str, Any]:
     """Analyze netlist data to provide insights.
 
     Args:
